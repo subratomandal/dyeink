@@ -48,4 +48,4 @@ I used industry-standard technologies to keep the codebase maintainable and scal
  
 ##  Contact
 
-Created by subratomandal - https://github.com/subratomandalme
+Created by https://github.com/subratomandalme
