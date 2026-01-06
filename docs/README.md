@@ -1,7 +1,7 @@
 # DyeInk
 A simple to use, fast, and minimalistic blogging site.
 ## Live
-[![Live](https://vercel.com/button)](https://dyeink.subratomandal.com)
+[![Link](https://vercel.com/button)](https://dyeink.subratomandal.com)
 ## Features
 
 *   **`Writing`**: A minimalistic text editor that gets out of your way
@@ -48,4 +48,4 @@ I used industry-standard technologies to keep the codebase maintainable and scal
  
 ##  Contact
 
-Created by https://github.com/subratomandalme
+Created by https://github.com/subratomandal
