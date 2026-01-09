@@ -1,0 +1,30 @@
+name = "dyeink-api"
+main = "src/worker.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+NODE_ENV = "production"
+
+# Add your secrets via wrangler secret put
+# MONGODB_URI
+# AUTH0_DOMAIN
+# AUTH0_CLIENT_ID
+# AUTH0_CLIENT_SECRET
+# AUTH0_AUDIENCE
+# AUTH0_MANAGEMENT_API_TOKEN
+# R2_ACCOUNT_ID
+# R2_ACCESS_KEY_ID
+# R2_SECRET_ACCESS_KEY
+# R2_BUCKET_NAME
+# R2_PUBLIC_URL
+# VERCEL_TOKEN
+# VERCEL_PROJECT_ID
+# VERCEL_TEAM_ID
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "dyeink-images"
+
+[triggers]
+crons = []

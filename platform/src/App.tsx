@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { useEffect } from 'react'
 import { useAuthStore } from './stores/authStore'
 import { useThemeStore } from './stores/themeStore'
-import { supabase } from './lib/supabase'
 import Landing from './features/landing/Landing'
 import Login from './features/auth/Login'
 import Register from './features/auth/Register'
@@ -20,6 +19,7 @@ import { ToastContainer } from './components/common/feedback/Toast'
 import { SimpleErrorBoundary } from './components/common/feedback/SimpleErrorBoundary'
 import AuthShellSkeleton from './components/admin/skeletons/AuthShellSkeleton'
 import './styles/globals.css'
+
 interface ProtectedRouteProps {
     children: React.ReactNode
 }
@@ -36,6 +36,7 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
     return <>{children}</>
 }
+
 function PublicRoute({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuthStore()
     if (isLoading) {
@@ -46,6 +47,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     }
     return <>{children}</>
 }
+
 function ThemeInit() {
     const theme = useThemeStore((state) => state.theme)
     useEffect(() => {
@@ -53,22 +55,25 @@ function ThemeInit() {
     }, [theme])
     return null
 }
+
 function AuthListener() {
     const navigate = useNavigate()
     const initialize = useAuthStore((state) => state.initialize)
+
     useEffect(() => {
+        // Initialize Auth0 authentication
         initialize()
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, _session) => {
-            if (event === 'PASSWORD_RECOVERY') {
-                navigate('/admin/settings?tab=Security')
-            }
-        })
-        return () => {
-            authListener.subscription.unsubscribe()
+
+        // Handle password recovery redirect (if needed)
+        const searchParams = new URLSearchParams(window.location.search)
+        if (searchParams.has('password_reset')) {
+            navigate('/admin/settings?tab=Security')
         }
     }, [initialize, navigate])
+
     return null
 }
+
 function App() {
     return (
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -76,7 +81,6 @@ function App() {
             <AuthListener />
             <ToastContainer />
             <Routes>
-
                 <Route path="/" element={
                     !window.location.hostname.includes('localhost') &&
                         !window.location.hostname.includes('vercel.app') &&
@@ -150,5 +154,5 @@ function App() {
         </BrowserRouter>
     )
 }
-export default App
 
+export default App
