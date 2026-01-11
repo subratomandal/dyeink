@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../_lib/mongodb';
-import { getAuthUser } from '../_lib/auth';
+import { getDb } from '../../_lib/mongodb';
+import { getAuthUser } from '../../_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updatedAt: new Date(),
     };
 
-    await db.collection('site_settings').insertOne(settings);
+    await db.collection('site_settings').insertOne(settings as any);
 
     return res.status(201).json({
       id: settings._id,

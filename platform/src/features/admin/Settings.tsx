@@ -821,7 +821,7 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS leetcode_link TEXT;`)
                                                 await postService.deleteAllPosts()
 
                                                 try {
-                                                    await apiClient.delete('/delete-user')
+                                                    await apiClient.delete('/auth/delete')
                                                 } catch (e) {
                                                     console.error('Delete user API error:', e)
                                                 }

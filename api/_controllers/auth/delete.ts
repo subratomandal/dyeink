@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from './_lib/mongodb';
-import { getAuthUser } from './_lib/auth';
+import { getDb } from '../../_lib/mongodb';
+import { getAuthUser } from '../../_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Delete user data from MongoDB
     await Promise.all([
-      db.collection('users').deleteOne({ _id: authUser.id }),
+      db.collection('users').deleteOne({ _id: authUser.id as any }),
       db.collection('site_settings').deleteOne({ userId: authUser.id }),
       db.collection('posts').deleteMany({ userId: authUser.id }),
     ]);

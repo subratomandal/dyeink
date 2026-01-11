@@ -15,7 +15,7 @@ export const subscribersService = {
     customDomain?: string;
   }): Promise<{ ok: boolean; message: string }> {
     try {
-      const response = await apiClient.post('/subscribe', options);
+      const response = await apiClient.post('/subscribers/subscribe', options);
       return response.data;
     } catch (error: any) {
       console.error('Error subscribing:', error);

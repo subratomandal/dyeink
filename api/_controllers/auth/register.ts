@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../_lib/mongodb';
-import { getAuthUser } from '../_lib/auth';
+import { getDb } from '../../_lib/mongodb';
+import { getAuthUser } from '../../_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: new Date(),
       };
 
-      await db.collection('users').insertOne(newUser);
+      await db.collection('users').insertOne(newUser as any);
       user = newUser;
 
       // Create default site settings
