@@ -21,12 +21,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET - Get current user's settings
   if (req.method === 'GET') {
     try {
-      let settings = await db.collection('site_settings').findOne({ userId: authUser.id });
+      let settings: any = await db.collection('site_settings').findOne({ userId: authUser.id });
 
       if (!settings) {
         // Create default settings
         const subdomain = `blog-${authUser.id.slice(0, 8)}`;
-        settings = {
+        const newSettings = {
           userId: authUser.id,
           siteName: authUser.name || 'My Blog',
           siteDescription: '',
@@ -36,7 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        await db.collection('site_settings').insertOne(settings as any);
+        const result = await db.collection('site_settings').insertOne(newSettings);
+        settings = { ...newSettings, _id: result.insertedId };
       }
 
       return res.status(200).json({
@@ -100,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { upsert: true }
       );
 
-      const settings = await db.collection('site_settings').findOne({ userId: authUser.id });
+      const settings: any = await db.collection('site_settings').findOne({ userId: authUser.id });
 
       return res.status(200).json({
         id: settings!._id,

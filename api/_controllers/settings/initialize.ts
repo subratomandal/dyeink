@@ -24,9 +24,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const db = await getDb();
 
     // Check if settings already exist
-    let settings = await db.collection('site_settings').findOne({ userId: authUser.id });
+    const existingSettings = await db.collection('site_settings').findOne({ userId: authUser.id });
+    let settings: any;
 
-    if (settings) {
+    if (existingSettings) {
+      settings = existingSettings;
+    } else {
+      const { siteName, siteDescription, subdomain } = req.body;
+      const defaultSubdomain = subdomain || `blog-${authUser.id.slice(0, 8)}`;
+
+      const newSettings = {
+        userId: authUser.id,
+        siteName: siteName || authUser.name || 'My Blog',
+        siteDescription: siteDescription || '',
+        subdomain: defaultSubdomain,
+        customDomain: null,
+        domainStatus: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const result = await db.collection('site_settings').insertOne(newSettings);
+      settings = { ...newSettings, _id: result.insertedId };
+    }
+
+    if (existingSettings) {
       return res.status(200).json({
         id: settings._id,
         userId: settings.userId,
@@ -39,22 +61,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: settings.updatedAt,
       });
     }
-
-    const { siteName, siteDescription, subdomain } = req.body;
-    const defaultSubdomain = subdomain || `blog-${authUser.id.slice(0, 8)}`;
-
-    settings = {
-      userId: authUser.id,
-      siteName: siteName || authUser.name || 'My Blog',
-      siteDescription: siteDescription || '',
-      subdomain: defaultSubdomain,
-      customDomain: null,
-      domainStatus: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    await db.collection('site_settings').insertOne(settings as any);
 
     return res.status(201).json({
       id: settings._id,
