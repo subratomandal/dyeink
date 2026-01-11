@@ -1,49 +1,55 @@
-import { createClient } from '@supabase/supabase-js'
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getDb } from './_lib/mongodb';
+import { getAuthUser } from './_lib/auth';
 
-export const config = {
-    runtime: 'edge',
-}
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-export default async function handler(request: Request) {
-    if (request.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405 })
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST' && req.method !== 'DELETE') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const authUser = await getAuthUser(req);
+  if (!authUser) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const db = await getDb();
+
+    // Delete user from Auth0 (if management token is available)
+    const mgmtToken = process.env.AUTH0_MANAGEMENT_API_TOKEN;
+    const auth0Domain = process.env.AUTH0_DOMAIN;
+
+    if (mgmtToken && auth0Domain) {
+      try {
+        await fetch(`https://${auth0Domain}/api/v2/users/${authUser.auth0Id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${mgmtToken}`,
+          },
+        });
+      } catch (e) {
+        console.error('Failed to delete user from Auth0:', e);
+      }
     }
 
-    try {
-        const authHeader = request.headers.get('Authorization')
-        if (!authHeader) {
-            return new Response('Missing Authorization header', { status: 401 })
-        }
+    // Delete user data from MongoDB
+    await Promise.all([
+      db.collection('users').deleteOne({ _id: authUser.id }),
+      db.collection('site_settings').deleteOne({ userId: authUser.id }),
+      db.collection('posts').deleteMany({ userId: authUser.id }),
+    ]);
 
-        const supabaseUrl = process.env.VITE_SUPABASE_URL
-        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-        if (!supabaseUrl || !supabaseServiceKey) {
-            return new Response('Server Configuration Error', { status: 500 })
-        }
-
-        const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-        const token = authHeader.replace('Bearer ', '')
-        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
-
-        if (userError || !user) {
-            return new Response('Invalid Token', { status: 401 })
-        }
-        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id)
-
-        if (deleteError) {
-            console.error('Delete User Error:', deleteError)
-            return new Response(JSON.stringify({ error: deleteError.message }), { status: 500 })
-        }
-
-        return new Response(JSON.stringify({ success: true }), {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            },
-        })
-    } catch (e: any) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500 })
-    }
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return res.status(500).json({ error: 'Failed to delete user' });
+  }
 }

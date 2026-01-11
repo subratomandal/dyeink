@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { settingsService } from '../../services/settingsService'
-import { supabase } from '../../lib/supabase'
-
+import { useAuthStore } from '../../stores/authStore'
+import apiClient from '../../lib/apiClient'
 import { useAdminStore } from '../../stores/adminStore'
 import { AlertTriangle, CheckCircle2, Globe } from 'lucide-react'
 import SettingsSkeleton from '../../components/admin/skeletons/SettingsSkeleton'
@@ -34,15 +34,14 @@ const Settings: React.FC = () => {
     const [deleteType, setDeleteType] = useState<'posts' | 'publication' | null>(null)
     const [deleteConfirmation, setDeleteConfirmation] = useState("")
     const [isDeleting, setIsDeleting] = useState(false)
+    const { logout } = useAuthStore()
 
     const tabs = [
         { id: 'Basics', label: 'Basics' },
         { id: 'Publication', label: 'Publication' },
-        { id: 'Security', label: 'Security' },
         { id: 'Danger', label: 'Danger Zone', danger: true },
     ]
-    const [newPassword, setNewPassword] = useState("")
-    const [confirmPassword, setConfirmPassword] = useState("")
+    const { user } = useAuthStore()
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
         const tabParam = params.get('tab')
@@ -50,10 +49,10 @@ const Settings: React.FC = () => {
             setActiveTab(tabParam)
         }
         loadSettings()
-        supabase.auth.getUser().then(({ data }) => {
-            if (data.user?.email) setCurrentUserEmail(data.user.email)
-        })
-    }, [])
+        if (user?.email) {
+            setCurrentUserEmail(user.email)
+        }
+    }, [user])
     const loadSettings = () => {
         fetchSettings()
     }
@@ -100,14 +99,6 @@ const Settings: React.FC = () => {
                 updateSettingsInCache(updated)
                 setSubdomain(updated.subdomain || "")
                 await fetchSettings(true)
-                await fetchSettings(true)
-                const { error: authError } = await supabase.auth.updateUser({
-                    data: {
-                        name: pubName,
-                        full_name: pubName
-                    }
-                })
-                if (authError) console.error("Failed to sync auth user name:", authError)
                 addToast({
                     type: 'success',
                     message: 'Settings saved successfully'
@@ -644,78 +635,6 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS leetcode_link TEXT;`)
                         )}
                     </div>
                 )}
-                {activeTab === 'Security' && (
-                    <div style={{ maxWidth: '600px' }}>
-                        <div className="setting-group" style={{ marginBottom: '2.5rem' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Change Password</h3>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>Ensure your account is using a long, random password to stay secure.</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                <input
-                                    type="password"
-                                    placeholder="New Password"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.75rem',
-                                        background: 'transparent',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '6px',
-                                        color: 'inherit',
-                                        fontSize: '1rem'
-                                    }}
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Confirm New Password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.75rem',
-                                        background: 'transparent',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '6px',
-                                        color: 'inherit',
-                                        fontSize: '1rem'
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        <div style={{ marginTop: '2rem' }}>
-                            <button
-                                onClick={async () => {
-                                    if (newPassword.length < 6) {
-                                        addToast({ type: 'error', message: 'Password must be at least 6 characters.' })
-                                        return
-                                    }
-                                    if (newPassword !== confirmPassword) {
-                                        addToast({ type: 'error', message: 'Passwords do not match.' })
-                                        return
-                                    }
-                                    setSaving(true)
-                                    try {
-                                        const { error } = await supabase.auth.updateUser({ password: newPassword })
-                                        if (error) throw error
-                                        addToast({ type: 'success', message: 'Password updated successfully.' })
-                                        setNewPassword("")
-                                        setConfirmPassword("")
-                                    } catch (err: any) {
-                                        console.error('Update password failed', err)
-                                        addToast({ type: 'error', message: err.message || 'Failed to update password.' })
-                                    } finally {
-                                        setSaving(false)
-                                    }
-                                }}
-                                disabled={saving}
-                                className="btn btn-primary"
-                                style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', padding: '0.75rem 1.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 600 }}
-                            >
-                                {saving ? 'Updating...' : 'Update Password'}
-                            </button>
-                        </div>
-                    </div>
-                )}
                 {activeTab === 'Danger' && (
                     <div className="settings-danger-zone" style={{ maxWidth: '600px' }}>
                         <div style={{ border: '1px solid var(--border-color)', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem' }}>
@@ -901,21 +820,13 @@ ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS leetcode_link TEXT;`)
                                                 const { postService } = await import('../../services/postService')
                                                 await postService.deleteAllPosts()
 
-                                                const { data: { session } } = await supabase.auth.getSession()
-                                                if (session?.access_token) {
-                                                    try {
-                                                        await fetch('/api/delete-user', {
-                                                            method: 'POST',
-                                                            headers: {
-                                                                'Authorization': `Bearer ${session.access_token}`
-                                                            }
-                                                        })
-                                                    } catch (e) { }
+                                                try {
+                                                    await apiClient.delete('/delete-user')
+                                                } catch (e) {
+                                                    console.error('Delete user API error:', e)
                                                 }
 
-                                                const { useAuthStore } = await import('../../stores/authStore')
-                                                await supabase.auth.signOut()
-                                                await useAuthStore.getState().logout()
+                                                await logout()
                                                 window.location.href = '/'
                                             }
                                             setShowDeleteModal(false)

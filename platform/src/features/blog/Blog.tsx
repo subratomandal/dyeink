@@ -3,7 +3,6 @@ import { Link, useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { postService } from '../../services/postService'
 import { settingsService } from '../../services/settingsService'
 import DOMPurify from 'dompurify'
-import { supabase } from '../../lib/supabase'
 import type { Post } from '../../types'
 import { format } from 'date-fns'
 import ThemeToggle from '../../components/common/ui/ThemeToggle'
@@ -55,7 +54,7 @@ export default function Blog({ isCustomDomain = false }: BlogProps) {
     const [leetcodeLink, setLeetcodeLink] = useState<string | null>(null)
 
     const [newsletterEmail, setNewsletterEmail] = useState<string | null>(null)
-    const [blogId, setBlogId] = useState<number | null>(null)
+    const [blogId, setBlogId] = useState<string | number | null>(null)
     const { addToast } = useToast()
     const [isSubscribeOpen, setIsSubscribeOpen] = useState(false)
     const contentRef = useRef<HTMLDivElement>(null)
@@ -122,21 +121,12 @@ export default function Blog({ isCustomDomain = false }: BlogProps) {
                 if (slug && fetchedPosts.length > 0) {
                     const activePost = fetchedPosts.find(p => p.slug === slug)
                     if (activePost) {
-                        const currentViews = activePost.views || 0
-                        supabase
-                            .from('posts')
-                            .update({ views: currentViews + 1 })
-                            .eq('id', activePost.id)
-                            .then(({ error }) => {
-                                if (error) console.error('VIEW ERROR:', error)
-                            })
-                        const today = format(new Date(), 'yyyy-MM-dd')
-                        supabase.rpc('increment_daily_views', {
-                            p_post_id: activePost.id,
-                            p_date: today
-                        }).then(({ error }) => {
-                            if (error) console.error('Stats Update Error (RPC):', error)
-                        })
+                        // Track view via API
+                        fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/hit`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ postId: activePost.id, type: 'view' })
+                        }).catch(err => console.error('View tracking error:', err))
                     }
                 }
             } catch (error) {
@@ -479,33 +469,12 @@ export default function Blog({ isCustomDomain = false }: BlogProps) {
                                                         message: 'Link copied to clipboard',
                                                         duration: 2000
                                                     })
-                                                    const currentShares = post.shares || 0
-                                                    supabase.from('posts').update({ shares: currentShares + 1 }).eq('id', post.id).then(({ error }) => {
-                                                        if (error) console.error('SHARE ERROR:', error)
-                                                    })
-                                                    const today = format(new Date(), 'yyyy-MM-dd')
-                                                    supabase.from('daily_post_stats')
-                                                        .select('id, shares')
-                                                        .eq('post_id', post.id)
-                                                        .eq('date', today)
-                                                        .single()
-                                                        .then(({ data: daily }) => {
-                                                            if (daily) {
-                                                                supabase.from('daily_post_stats')
-                                                                    .update({ shares: (daily.shares || 0) + 1 })
-                                                                    .eq('id', daily.id)
-                                                                    .then(r => r.error && console.error('Graph Share Update Fail:', r.error))
-                                                            } else {
-                                                                supabase.from('daily_post_stats')
-                                                                    .insert({
-                                                                        post_id: post.id,
-                                                                        date: today,
-                                                                        views: 0,
-                                                                        shares: 1
-                                                                    })
-                                                                    .then(r => r.error && console.error('Graph Share Insert Fail:', r.error))
-                                                            }
-                                                        })
+                                                    // Track share via API
+                                                    fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/hit`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ postId: post.id, type: 'share' })
+                                                    }).catch(err => console.error('Share tracking error:', err))
                                                 }}
                                                 style={{
                                                     background: 'none',

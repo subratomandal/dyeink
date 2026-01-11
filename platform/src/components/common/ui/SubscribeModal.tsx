@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, CheckCircle } from 'lucide-react'
 import WaveLoader from '../feedback/WaveLoader'
-import { supabase } from '../../../lib/supabase'
 import { useToast } from '../feedback/Toast'
 interface SubscribeModalProps {
     isOpen: boolean
     onClose: () => void
-    blogId?: number | null
+    blogId?: string | number | null
 }
-export default function SubscribeModal({ isOpen, onClose }: SubscribeModalProps) {
+export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeModalProps) {
     const [email, setEmail] = useState('')
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -19,12 +18,18 @@ export default function SubscribeModal({ isOpen, onClose }: SubscribeModalProps)
         e.preventDefault()
         setLoading(true)
         try {
-            const { error } = await supabase
-                .from('subscribers')
-                .insert({ email })
-            if (error && error.code !== '23505') { 
-                throw error
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/subscribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, blogId })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok && data.error !== 'Already subscribed') {
+                throw new Error(data.error || 'Subscription failed')
             }
+
             setSuccess(true)
             addToast({ type: 'success', message: 'Successfully subscribed!', duration: 3000 })
             setTimeout(() => {
@@ -32,9 +37,9 @@ export default function SubscribeModal({ isOpen, onClose }: SubscribeModalProps)
                 setSuccess(false)
                 setEmail('')
             }, 2000)
-        } catch (error) {
+        } catch (error: any) {
             console.error('Subscription error:', error)
-            addToast({ type: 'error', message: 'Something went wrong.', duration: 3000 })
+            addToast({ type: 'error', message: error.message || 'Something went wrong.', duration: 3000 })
         } finally {
             setLoading(false)
         }
@@ -213,4 +218,3 @@ export default function SubscribeModal({ isOpen, onClose }: SubscribeModalProps)
         document.body
     )
 }
- 

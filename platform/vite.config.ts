@@ -30,7 +30,7 @@ export default defineConfig({
                     'vendor-react': ['react', 'react-dom', 'react-router-dom'],
                     'vendor-ui': ['framer-motion', 'lucide-react', 'recharts', 'clsx', 'tailwind-merge'],
                     'vendor-3d': ['three', 'ogl', 'postprocessing', 'gsap'],
-                    'vendor-utils': ['date-fns', 'dompurify', '@supabase/supabase-js', 'zustand']
+                    'vendor-utils': ['date-fns', 'dompurify', '@auth0/auth0-spa-js', 'zustand', 'axios']
                 }
             }
         }

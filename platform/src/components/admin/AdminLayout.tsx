@@ -44,7 +44,7 @@ export default function AdminLayout() {
             const currentSettings = useAdminStore.getState().settings
             if (!currentSettings) {
                 const defaultSubdomain = `blog-${user.id.slice(0, 8)}`
-                const defaultName = user.user_metadata?.full_name || 'User'
+                const defaultName = user.name || 'User'
                 try {
                     const newSettings = await settingsService.initializeSettings({
                         siteName: defaultName,

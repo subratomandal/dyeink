@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { postService } from '../services/postService'
 import { settingsService, type SiteSettings } from '../services/settingsService'
-import { supabase } from '../lib/supabase'
+import apiClient from '../lib/apiClient'
 import type { Post } from '../types'
 interface AdminState {
     posts: Post[] | null
@@ -90,7 +90,7 @@ export const useAdminStore = create<AdminState>()(
             stats: null,
             statsLoading: false,
             statsLastFetched: null,
-            fetchStats: async (userId: string, force = false) => {
+            fetchStats: async (_userId: string, force = false) => {
                 const { stats, statsLastFetched, statsLoading } = get()
                 if (statsLoading) return
                 const now = Date.now()
@@ -100,77 +100,14 @@ export const useAdminStore = create<AdminState>()(
 
                 set({ statsLoading: true })
                 try {
-
-                    const { data: userPosts, error: postsErr } = await supabase
-                        .from('posts')
-                        .select('id, views, shares, created_at')
-                        .eq('user_id', userId)
-
-                    if (postsErr) throw postsErr
-
-                    const totalViews = userPosts?.reduce((acc: number, p: any) => acc + (p.views || 0), 0) || 0
-                    const totalShares = userPosts?.reduce((acc: number, p: any) => acc + (p.shares || 0), 0) || 0
-                    const postIds = userPosts?.map((p: any) => p.id) || []
-
-
-                    const { format } = await import('date-fns')
-
-                    const last7Days: any[] = []
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date()
-                        d.setDate(d.getDate() - i)
-                        const dateKey = format(d, 'yyyy-MM-dd')
-                        last7Days.push({
-                            date: dateKey,
-                            name: format(d, 'MMM d'),
-                            views: 0,
-                            shares: 0,
-                            published: 0
-                        })
-                    }
-
-                    const queryDate = last7Days[0].date
-                    const mergedGraphData = [...last7Days]
-
-
-                    if (userPosts) {
-                        userPosts.forEach((p: any) => {
-                            if (p.created_at) {
-                                const dateKey = format(new Date(p.created_at), 'yyyy-MM-dd')
-                                const entry = mergedGraphData.find(d => d.date === dateKey)
-                                if (entry) {
-                                    entry.published += 1
-                                }
-                            }
-                        })
-                    }
-
-
-                    if (postIds.length > 0) {
-                        const { data: daily, error: dailyErr } = await supabase
-                            .from('daily_post_stats')
-                            .select('date, views, shares')
-                            .in('post_id', postIds)
-                            .gte('date', queryDate)
-
-                        if (dailyErr) console.error('Daily Stats Fetch Error:', dailyErr)
-
-                        if (daily) {
-                            daily.forEach((record: any) => {
-                                const dayEntry = mergedGraphData.find(d => d.date === record.date)
-                                if (dayEntry) {
-                                    dayEntry.views += (record.views || 0)
-                                    dayEntry.shares += (record.shares || 0)
-                                }
-                            })
-                        }
-                    }
+                    const response = await apiClient.get('/stats')
+                    const data = response.data
 
                     set({
                         stats: {
-                            totalViews,
-                            totalShares,
-                            graphData: mergedGraphData
+                            totalViews: data.totalViews || 0,
+                            totalShares: data.totalShares || 0,
+                            graphData: data.graphData || []
                         },
                         statsLastFetched: Date.now(),
                         statsLoading: false
@@ -206,4 +143,3 @@ export const useAdminStore = create<AdminState>()(
         }
     )
 )
-

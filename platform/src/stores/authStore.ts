@@ -6,7 +6,6 @@ import auth0Client, {
   getAccessToken,
   logout as auth0Logout,
   handleRedirectCallback,
-  checkSession,
 } from '../lib/auth0';
 import apiClient from '../lib/apiClient';
 
@@ -37,7 +36,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       isAuthenticated: false,
       isLoading: true,

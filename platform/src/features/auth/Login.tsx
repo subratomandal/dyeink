@@ -7,7 +7,7 @@ import { Mail, CheckCircle2, Github } from 'lucide-react'
 import WaveLoader from '../../components/common/feedback/WaveLoader'
 import { useToast } from '../../components/common/feedback/Toast'
 import { useAuthStore } from '../../stores/authStore'
-import auth0Client, { resetPassword } from '../../lib/auth0'
+import { resetPassword } from '../../lib/auth0'
 
 export default function Login() {
     const navigate = useNavigate()
@@ -39,8 +39,7 @@ export default function Login() {
         }
     }
 
-    const handleEmailLogin = async (e: FormEvent) => {
-        e.preventDefault()
+    const handleEmailLogin = async () => {
         setLoading(true)
         try {
             await login()
