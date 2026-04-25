@@ -46,16 +46,18 @@ migrations_dir = "migrations"
 binding = "IMAGES"
 bucket_name = "dyeink-images"
 
-# -------- Analytics Engine: high-volume event stream --------
-[[analytics_engine_datasets]]
-binding = "ANALYTICS"
-dataset = "dyeink_events"
-
 # -------- Worker runtime vars --------
 [vars]
 # Optional. Set via `wrangler secret put R2_PUBLIC_URL` instead if your R2
 # bucket has a custom domain — those values shouldn't be in git.
 D1_HIT_ROLLUPS = "on"
+
+# Analytics Engine support exists in the Worker code but is intentionally not
+# bound by default because accounts must enable it first. If you enable it in
+# Cloudflare later, add:
+# [[analytics_engine_datasets]]
+# binding = "ANALYTICS"
+# dataset = "dyeink_events"
 
 [observability]
 enabled = true

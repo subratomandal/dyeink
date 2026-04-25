@@ -119,3 +119,24 @@ Follow-up verification:
 - `npm run build` passed after the visual rollback.
 - Local Worker smoke checked `/blog` and `/blog/smoke-test-post` as SPA routes.
 - Local Worker smoke checked `/public/posts.json`, `/public/posts/smoke-test-post.json`, `/public/settings.json`, and `/api/hit`.
+
+## Follow-Up: Cloudflare Deploy Analytics Engine Failure
+
+User deploy log on 2026-04-25:
+- Build succeeded.
+- Asset upload succeeded.
+- Worker deploy failed with Cloudflare API code `10089`.
+- Cause: `wrangler.toml` required `[[analytics_engine_datasets]]`, but the account has not enabled Analytics Engine.
+
+Fix:
+- Removed the default Analytics Engine binding from root `wrangler.toml`.
+- Removed the default Analytics Engine binding from `backend/wrangler.toml`.
+- Kept optional Analytics Engine support in `backend/src/worker.ts`; it only writes when `env.ANALYTICS` exists.
+- Kept `D1_HIT_ROLLUPS = "on"` so Stats keeps working without Analytics Engine.
+- Updated env comments to make Analytics Engine optional, not required.
+
+Verification:
+- `npm run build` passed after removing the binding.
+- `npx wrangler deploy --dry-run` reached `--dry-run: exiting now`.
+- Dry-run binding list now contains `DB`, `IMAGES`, `ASSETS`, and `D1_HIT_ROLLUPS`; it no longer contains `ANALYTICS`.
+- Wrangler printed a local log-file permission warning for `/Users/subratomandal/Library/Preferences/.wrangler/logs/...`, but the dry-run process exited successfully.
