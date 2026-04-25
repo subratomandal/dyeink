@@ -8,14 +8,6 @@ import PostsSkeleton from '@/components/admin/skeletons/PostsSkeleton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table'
-import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -72,58 +64,73 @@ export default function Posts() {
                     No published posts yet.
                 </div>
             ) : (
-                <div className="animate-fade-in overflow-x-auto rounded-lg">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="text-xs font-bold uppercase tracking-wider">Title</TableHead>
-                                <TableHead className="text-xs font-bold uppercase tracking-wider">Status</TableHead>
-                                <TableHead className="text-xs font-bold uppercase tracking-wider">Date</TableHead>
-                                <TableHead className="w-12" />
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredPosts.map((post) => (
-                                <TableRow key={post.id}>
-                                    <TableCell className="py-6 align-middle">
-                                        <Link
-                                            to={`/admin/posts/${post.id}/edit`}
-                                            className="block max-w-xs truncate text-base font-bold text-foreground hover:underline"
-                                            title={post.title}
-                                        >
-                                            {post.title}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell className="py-6 align-middle">
-                                        <Badge variant={post.published ? 'success' : 'warning'}>
-                                            {post.published ? 'Published' : 'Draft'}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="py-6 align-middle text-sm text-muted-foreground">
+                <div className="animate-fade-in">
+                    <div className="mb-3 hidden grid-cols-[minmax(0,1fr)_140px_150px_96px] items-center px-5 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground md:grid">
+                        <span>Title</span>
+                        <span>Status</span>
+                        <span>Date</span>
+                        <span className="text-right">Actions</span>
+                    </div>
+
+                    <div className="space-y-3">
+                        {filteredPosts.map((post, index) => (
+                            <article
+                                key={post.id}
+                                className="group grid gap-4 rounded-3xl border border-border/80 bg-card/75 p-4 shadow-[0_14px_50px_hsl(var(--foreground)/0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/30 hover:bg-card md:grid-cols-[minmax(0,1fr)_140px_150px_96px] md:items-center md:p-5"
+                            >
+                                <div className="min-w-0">
+                                    <div className="mb-1 font-mono text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                                        #{String(index + 1).padStart(2, '0')}
+                                    </div>
+                                    <Link
+                                        to={`/admin/posts/${post.id}/edit`}
+                                        className="block max-w-full truncate font-heading text-xl font-semibold leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
+                                        title={post.title}
+                                    >
+                                        {post.title}
+                                    </Link>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 md:block">
+                                    <span className="font-mono text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground md:hidden">
+                                        Status
+                                    </span>
+                                    <Badge variant={post.published ? 'success' : 'warning'} className="rounded-full px-3 py-1">
+                                        {post.published ? 'Published' : 'Draft'}
+                                    </Badge>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3 md:block">
+                                    <span className="font-mono text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground md:hidden">
+                                        Date
+                                    </span>
+                                    <time
+                                        dateTime={post.createdAt}
+                                        className="inline-flex rounded-full border border-border/80 bg-background/60 px-3 py-1 font-mono text-xs text-muted-foreground"
+                                    >
                                         {formatDateShort(post.createdAt)}
-                                    </TableCell>
-                                    <TableCell className="py-6 text-right align-middle">
-                                        <div className="flex justify-end gap-2">
-                                            <Button asChild size="icon" variant="secondary" className="h-8 w-8 rounded-full">
-                                                <Link to={`/admin/posts/${post.id}/edit`} aria-label="Edit">
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
-                                                onClick={() => setPostToDelete(post.id)}
-                                                aria-label="Delete"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                                    </time>
+                                </div>
+
+                                <div className="flex justify-end gap-2">
+                                    <Button asChild size="icon" variant="secondary" className="h-9 w-9 rounded-full">
+                                        <Link to={`/admin/posts/${post.id}/edit`} aria-label={`Edit ${post.title}`}>
+                                            <Edit2 className="h-4 w-4" />
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-9 w-9 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
+                                        onClick={() => setPostToDelete(post.id)}
+                                        aria-label={`Delete ${post.title}`}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
                 </div>
             )}
 

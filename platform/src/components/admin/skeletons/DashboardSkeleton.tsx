@@ -2,23 +2,35 @@ import Skeleton from '../../common/ui/Skeleton'
 
 export default function DashboardSkeleton() {
     return (
-        <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Skeleton style={{ height: '40px', width: '200px' }} />
-                <Skeleton style={{ height: '40px', width: '120px' }} />
+        <div className="animate-fade-in mx-auto flex max-w-[1200px] flex-col gap-8">
+            <div className="flex items-start justify-between gap-4">
+                <div className="space-y-3">
+                    <Skeleton className="h-11 w-56 rounded-2xl" />
+                    <Skeleton className="h-5 w-48 rounded-full" />
+                </div>
+                <Skeleton className="h-11 w-11 rounded-full" />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-                {[1, 2, 3, 4].map((i) => (
-                    <div key={i} style={{ padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                        <Skeleton style={{ height: '20px', width: '100px', marginBottom: '1rem' }} />
-                        <Skeleton style={{ height: '36px', width: '80px' }} />
+            <div className="grid gap-4 sm:grid-cols-3">
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-3xl border border-border/80 bg-card/70 p-5">
+                        <Skeleton className="mb-4 h-4 w-24 rounded-full" />
+                        <Skeleton className="h-9 w-20 rounded-2xl" />
                     </div>
                 ))}
             </div>
 
-            <div style={{ height: '400px', background: 'var(--bg-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
-                <Skeleton style={{ height: '100%', width: '100%' }} />
+            <div className="rounded-3xl border border-border/80 bg-card/70 p-6">
+                <Skeleton className="mb-6 h-6 w-40 rounded-full" />
+                <div className="flex h-[300px] items-end gap-3">
+                    {[58, 78, 46, 88, 62, 92, 70, 84, 55].map((height, index) => (
+                        <Skeleton
+                            key={index}
+                            className="flex-1 rounded-t-2xl"
+                            style={{ height: `${height}%` }}
+                        />
+                    ))}
+                </div>
             </div>
         </div>
     )

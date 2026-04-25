@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, Cloud, ExternalLink, Image, KeyRound } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useAdminStore } from '@/stores/adminStore'
 import { settingsService } from '@/services/settingsService'
 import { postService } from '@/services/postService'
@@ -56,7 +56,9 @@ export default function Settings() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
         const tabParam = params.get('tab')
-        if (tabParam) setActiveTab(tabParam.toLowerCase())
+        if (tabParam && ['basics', 'security', 'danger'].includes(tabParam.toLowerCase())) {
+            setActiveTab(tabParam.toLowerCase())
+        }
         fetchSettings()
     }, [fetchSettings])
 
@@ -155,7 +157,6 @@ export default function Settings() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
                 <TabsList className="mb-6">
                     <TabsTrigger value="basics">Basics</TabsTrigger>
-                    <TabsTrigger value="deployment">Deployment</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="danger" className="data-[state=active]:text-red-500">
                         Danger Zone
@@ -258,105 +259,10 @@ export default function Settings() {
                     </Button>
                 </TabsContent>
 
-                <TabsContent value="deployment" className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Cloud className="h-4 w-4" />
-                                Live custom domain
-                            </CardTitle>
-                            <CardDescription>
-                                Host the live site on Cloudflare Workers, then attach your domain to the Worker.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="rounded-lg border bg-card/60 p-4 text-sm text-muted-foreground">
-                                Cloudflare supports Worker custom domains from the dashboard, Wrangler, and API for
-                                domains in your Cloudflare account. The old in-app Vercel flow in Git used Vercel's
-                                project-domain API; the Cloudflare equivalent for customer-owned domains is Cloudflare
-                                for SaaS custom hostnames, which needs a separate SaaS-zone setup.
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                                <Button asChild>
-                                    <a
-                                        href="https://dash.cloudflare.com/?to=/:account/workers/services/view/dyeink/production/settings/domains"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Open domain setup
-                                        <ExternalLink className="h-4 w-4" />
-                                    </a>
-                                </Button>
-                                <Button variant="outline" asChild>
-                                    <a
-                                        href="https://developers.cloudflare.com/workers/configuration/routing/custom-domains/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Custom domain guide
-                                    </a>
-                                </Button>
-                                <Button variant="outline" asChild>
-                                    <a
-                                        href="https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        SaaS domain API
-                                    </a>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Image className="h-4 w-4" />
-                                Image and public-content domain
-                            </CardTitle>
-                            <CardDescription>
-                                Use an R2 custom domain for uploads and generated public JSON artifacts.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="rounded-lg border bg-card/60 p-4 text-sm text-muted-foreground">
-                                Attach a custom domain to the `dyeink-images` R2 bucket, then set `R2_PUBLIC_URL` for
-                                uploaded images. If you serve generated public JSON directly from that domain, also set
-                                `VITE_PUBLIC_CONTENT_URL` at build time.
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                                <Button variant="outline" asChild>
-                                    <a
-                                        href="https://dash.cloudflare.com/?to=/:account/r2/default/buckets/dyeink-images/settings"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Open R2 bucket
-                                        <ExternalLink className="h-4 w-4" />
-                                    </a>
-                                </Button>
-                                <Button variant="outline" asChild>
-                                    <a
-                                        href="https://developers.cloudflare.com/r2/buckets/public-buckets/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        R2 custom domain guide
-                                    </a>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
                 <TabsContent value="security" className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <KeyRound className="h-4 w-4" />
-                                Change password
-                            </CardTitle>
+                            <CardTitle className="text-base">Change password</CardTitle>
                             <CardDescription>
                                 Updating your password signs out every other session immediately.
                             </CardDescription>

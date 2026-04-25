@@ -6,13 +6,17 @@ import DashboardSkeleton from '@/components/admin/skeletons/DashboardSkeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDateKey, formatDateShort } from '@/lib/date'
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, accent }: { label: string; value: string; accent: string }) {
     return (
-        <div className="flex-1 py-6">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-3xl border border-border/80 bg-card/75 p-5 shadow-[0_14px_50px_hsl(var(--foreground)/0.04)]">
+            <div className="mb-5 flex items-center justify-between">
+                <div className="h-px flex-1 bg-border/80" />
+                <div className={`ml-4 h-2.5 w-2.5 rounded-full ${accent}`} />
+            </div>
+            <div className="mb-2 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                 {label}
             </div>
-            <div className="text-3xl font-bold text-foreground">{value}</div>
+            <div className="font-heading text-4xl font-semibold tracking-tight text-foreground">{value}</div>
         </div>
     )
 }
@@ -60,27 +64,45 @@ export default function Dashboard() {
 
     return (
         <div className="animate-fade-in pb-16">
-            <div className="mb-8 flex items-center justify-between">
-                <h1 className="m-0 font-heading text-4xl font-semibold">Dashboard</h1>
+            <div className="mb-10 flex items-start justify-between">
+                <div>
+                    <h1 className="m-0 font-heading text-4xl font-semibold">Dashboard</h1>
+                    <p className="mt-2 text-lg text-muted-foreground">A quick read on your published work.</p>
+                </div>
             </div>
 
-            <section className="mb-12">
-                <h2 className="mb-6 text-xl font-semibold text-muted-foreground">Analytics</h2>
-
-                <div className="mb-8 flex gap-8 dashboard-stats-row">
-                    <Stat label="Total Views" value={(stats?.totalViews || 0).toLocaleString()} />
-                    <Stat label="Total Shares" value={(stats?.totalShares || 0).toLocaleString()} />
-                    <Stat label="Published" value={dashboardStats.publishedPosts.toString()} />
+            <section className="mb-12 space-y-5">
+                <div className="grid gap-4 dashboard-stats-row sm:grid-cols-3">
+                    <Stat label="Total Views" value={(stats?.totalViews || 0).toLocaleString()} accent="bg-cyan-400" />
+                    <Stat label="Total Shares" value={(stats?.totalShares || 0).toLocaleString()} accent="bg-amber-400" />
+                    <Stat label="Published" value={dashboardStats.publishedPosts.toString()} accent="bg-emerald-400" />
                 </div>
 
-                <div className="h-[300px] w-full min-w-0">
-                    {!ready || graphData.length === 0 ? (
-                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                            {!ready ? null : 'No stats recorded yet'}
+                <div className="rounded-[2rem] border border-border/80 bg-card/75 p-5 shadow-[0_20px_70px_hsl(var(--foreground)/0.05)]">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 className="font-heading text-xl font-semibold tracking-tight">Analytics</h2>
+                            <p className="text-sm text-muted-foreground">Views and shares across the latest window.</p>
                         </div>
-                    ) : (
-                        <NativeAreaChart data={graphData} />
-                    )}
+                        <div className="flex items-center gap-4 font-mono text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-cyan-400" /> Views
+                            </span>
+                            <span className="inline-flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-amber-400" /> Shares
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="h-[300px] w-full min-w-0">
+                        {!ready || graphData.length === 0 ? (
+                            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                {!ready ? null : 'No stats recorded yet'}
+                            </div>
+                        ) : (
+                            <NativeAreaChart data={graphData} />
+                        )}
+                    </div>
                 </div>
             </section>
 
@@ -88,7 +110,7 @@ export default function Dashboard() {
                 <h2 className="mb-6 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                 {dashboardStats.latestPost ? (
                     <Link to="/blog" className="block no-underline">
-                        <Card className="transition-all hover:border-foreground hover:scale-[1.005]">
+                        <Card className="rounded-[2rem] border-border/80 bg-card/75 shadow-[0_14px_50px_hsl(var(--foreground)/0.04)] transition-all hover:scale-[1.005] hover:border-foreground/30">
                             <CardContent className="p-6">
                                 <h3 className="mb-4 font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
                                     {dashboardStats.latestPost.title}
@@ -116,8 +138,7 @@ export default function Dashboard() {
 
             <style>{`
                 @media (max-width: 640px) {
-                    .dashboard-stats-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 1rem !important; }
-                    .dashboard-stats-row > div { padding: 0.5rem 0 !important; }
+                    .dashboard-stats-row { grid-template-columns: 1fr !important; }
                 }
             `}</style>
         </div>
@@ -172,8 +193,8 @@ function NativeAreaChart({ data }: { data: ChartPoint[] }) {
                     <stop offset="95%" stopColor="#00cbff" stopOpacity="0" />
                 </linearGradient>
                 <linearGradient id="dash_grad_shares" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity="0.18" />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity="0" />
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity="0.18" />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity="0" />
                 </linearGradient>
             </defs>
 
@@ -191,7 +212,7 @@ function NativeAreaChart({ data }: { data: ChartPoint[] }) {
 
             <path d={areaPath('shares')} fill="url(#dash_grad_shares)" />
             <path d={areaPath('views')} fill="url(#dash_grad_views)" />
-            <path d={linePath('shares')} fill="none" stroke="#8b5cf6" strokeWidth="2" />
+            <path d={linePath('shares')} fill="none" stroke="#f59e0b" strokeWidth="2" />
             <path d={linePath('views')} fill="none" stroke="#00cbff" strokeWidth="2" />
 
             {data.map((point, index) => (

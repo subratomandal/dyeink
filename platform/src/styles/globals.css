@@ -199,6 +199,27 @@
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--bg-glass-border);
   }
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background:
+      linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.7) 48%, hsl(var(--muted)) 100%);
+  }
+  .skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform: translateX(-110%);
+    background:
+      linear-gradient(90deg, transparent 0%, hsl(var(--foreground) / 0.08) 46%, transparent 100%);
+    animation: skeleton-shimmer 1.45s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  html[data-theme='light'] .skeleton-shimmer::after {
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.78) 46%, transparent 100%);
+  }
 }
 
 @keyframes fadeIn {
@@ -209,6 +230,19 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(110%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer::after {
+    animation: none;
+    display: none;
   }
 }
 
