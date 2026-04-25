@@ -6,13 +6,14 @@
 import { build } from 'esbuild'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { mkdirSync, existsSync } from 'node:fs'
+import { mkdirSync, existsSync, writeFileSync } from 'node:fs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..')
 const entry = resolve(repoRoot, 'backend/src/worker.ts')
 const outDir = resolve(repoRoot, 'platform/dist')
 const outFile = resolve(outDir, '_worker.js')
+const assetsIgnoreFile = resolve(outDir, '.assetsignore')
 
 if (!existsSync(outDir)) {
     mkdirSync(outDir, { recursive: true })
@@ -33,5 +34,9 @@ await build({
     legalComments: 'none',
     logLevel: 'info',
 })
+
+// Workers Assets must not upload Pages' _worker.js as a public static file.
+// Pages still recognizes _worker.js as the server-side entrypoint.
+writeFileSync(assetsIgnoreFile, '_worker.js\n')
 
 console.log(`✓ Worker bundled → ${outFile}`)
