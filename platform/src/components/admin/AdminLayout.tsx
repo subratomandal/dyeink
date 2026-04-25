@@ -144,7 +144,7 @@ export default function AdminLayout() {
 
     return (
         <div className="flex min-h-screen bg-background">
-            <aside className="fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]">
+            <aside className="liquidGL admin-liquidGL fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]">
                 <div className="px-5 pb-4 pt-8">
                     <AdminGreeting name={greetingName} />
                 </div>
@@ -206,6 +206,73 @@ export default function AdminLayout() {
             </main>
 
             <style>{`
+                .admin-liquidGL {
+                    --liquid-refraction: 0.02;
+                    --liquid-bevel-depth: 0.12;
+                    --liquid-bevel-width: 8%;
+                    --liquid-frost: 1.5px;
+                    isolation: isolate;
+                    overflow: hidden;
+                    background:
+                        radial-gradient(circle at 12% 0%, color-mix(in srgb, hsl(var(--foreground)) 10%, transparent), transparent 34%),
+                        linear-gradient(180deg, color-mix(in srgb, hsl(var(--card)) 82%, transparent), color-mix(in srgb, hsl(var(--background)) 72%, transparent)) !important;
+                    backdrop-filter: blur(calc(var(--liquid-frost) * 8)) saturate(1.35);
+                    -webkit-backdrop-filter: blur(calc(var(--liquid-frost) * 8)) saturate(1.35);
+                    box-shadow:
+                        12px 0 38px rgba(0, 0, 0, 0.14),
+                        inset -1px 0 0 color-mix(in srgb, hsl(var(--foreground)) 18%, transparent),
+                        inset 1px 0 0 color-mix(in srgb, hsl(var(--background)) 65%, transparent) !important;
+                }
+                .admin-liquidGL::before,
+                .admin-liquidGL::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    pointer-events: none;
+                }
+                .admin-liquidGL::before {
+                    z-index: 0;
+                    background:
+                        linear-gradient(90deg,
+                            color-mix(in srgb, hsl(var(--foreground)) 18%, transparent) 0,
+                            transparent var(--liquid-bevel-width),
+                            transparent calc(100% - var(--liquid-bevel-width)),
+                            color-mix(in srgb, hsl(var(--foreground)) 12%, transparent) 100%),
+                        radial-gradient(80% 18% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 12%, transparent), transparent 72%);
+                    opacity: var(--liquid-bevel-depth);
+                }
+                .admin-liquidGL::after {
+                    z-index: 1;
+                    background:
+                        linear-gradient(115deg, transparent 0%, transparent 38%, color-mix(in srgb, hsl(var(--foreground)) 16%, transparent) 48%, transparent 58%, transparent 100%);
+                    mix-blend-mode: screen;
+                    opacity: 0.42;
+                    animation: admin-liquid-specular 7s ease-in-out infinite alternate;
+                }
+                .admin-liquidGL > * {
+                    position: relative;
+                    z-index: 2;
+                }
+                @keyframes admin-liquid-specular {
+                    from {
+                        transform: translate3d(-24%, -10%, 0);
+                        opacity: 0.22;
+                    }
+                    to {
+                        transform: translate3d(24%, 10%, 0);
+                        opacity: 0.5;
+                    }
+                }
+                @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+                    .admin-liquidGL {
+                        background: hsl(var(--card)) !important;
+                    }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .admin-liquidGL::after {
+                        animation: none !important;
+                    }
+                }
                 @media (max-width: 640px) {
                     aside {
                         top: auto !important;
@@ -218,9 +285,29 @@ export default function AdminLayout() {
                         align-items: center !important;
                         border-right: 0 !important;
                         border-top: 1px solid hsl(var(--border)) !important;
+                        border-radius: 22px 22px 0 0 !important;
                         overflow-x: hidden !important;
                         overflow-y: hidden !important;
                         padding: 0 max(0.45rem, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0.45rem, env(safe-area-inset-left)) !important;
+                    }
+                    .admin-liquidGL {
+                        background:
+                            radial-gradient(100% 120% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 11%, transparent), transparent 46%),
+                            linear-gradient(180deg, color-mix(in srgb, hsl(var(--card)) 84%, transparent), color-mix(in srgb, hsl(var(--background)) 72%, transparent)) !important;
+                        backdrop-filter: blur(calc(var(--liquid-frost) * 7)) saturate(1.32);
+                        -webkit-backdrop-filter: blur(calc(var(--liquid-frost) * 7)) saturate(1.32);
+                        box-shadow:
+                            0 -12px 34px rgba(0, 0, 0, 0.16),
+                            inset 0 1px 0 color-mix(in srgb, hsl(var(--foreground)) 18%, transparent),
+                            inset 0 -1px 0 color-mix(in srgb, hsl(var(--background)) 62%, transparent) !important;
+                    }
+                    .admin-liquidGL::before {
+                        background:
+                            linear-gradient(180deg,
+                                color-mix(in srgb, hsl(var(--foreground)) 18%, transparent) 0,
+                                transparent var(--liquid-bevel-width),
+                                transparent calc(100% - var(--liquid-bevel-width)),
+                                color-mix(in srgb, hsl(var(--foreground)) 10%, transparent) 100%);
                     }
                     aside > div:first-child,
                     aside [data-section-label] { display: none !important; }
