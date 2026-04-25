@@ -1,4 +1,7 @@
 import { ArrowRight } from 'lucide-react'
+import { extent, max, ticks } from 'd3-array'
+import { scaleBand, scaleLinear } from 'd3-scale'
+import { area, curveBasis, line } from 'd3-shape'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAdminStore } from '@/stores/adminStore'
@@ -81,7 +84,7 @@ export default function Dashboard() {
                                     {!ready ? null : 'No stats recorded yet'}
                                 </div>
                             ) : (
-                                <NativeAnalyticsChart data={graphData} />
+                                <RidgelineAnalyticsChart data={graphData} />
                             )}
                         </div>
                     </CardContent>
@@ -144,130 +147,181 @@ type ChartPoint = {
     shares?: number
 }
 
-function NativeAnalyticsChart({ data }: { data: ChartPoint[] }) {
+function RidgelineAnalyticsChart({ data }: { data: ChartPoint[] }) {
     const width = 780
     const height = 320
-    const padding = { top: 38, right: 24, bottom: 50, left: 64 }
-    const innerWidth = width - padding.left - padding.right
+    const padding = { top: 32, right: 24, bottom: 48, left: 92 }
     const innerHeight = height - padding.top - padding.bottom
-    const values = data.flatMap((point) => [point.views || 0, point.shares || 0])
-    const maxValue = niceMax(Math.max(1, ...values))
-    const baseline = padding.top + innerHeight
-    const slotWidth = data.length > 0 ? innerWidth / data.length : innerWidth
-    const barWidth = Math.max(10, Math.min(34, slotWidth * 0.48))
-
-    const xFor = (index: number) =>
-        padding.left + (data.length <= 1 ? innerWidth / 2 : index * slotWidth + slotWidth / 2)
-    const yFor = (value: number) => baseline - (value / maxValue) * innerHeight
-    const linePath = (key: 'shares') =>
-        data
-            .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(point[key] || 0)}`)
-            .join(' ')
-    const yTicks = [maxValue, maxValue / 2, 0]
-    const labelStep = Math.max(1, Math.ceil(data.length / 5))
+    const values = data.flatMap((point) => [point.views || 0, point.shares || 0]).filter((value) => Number.isFinite(value))
+    const [rawMin = 0, rawMax = 1] = extent(values)
+    const domainMin = Math.min(0, rawMin)
+    const domainMax = rawMax <= domainMin ? domainMin + 1 : rawMax
+    const xScale = scaleLinear().domain([domainMin, domainMax]).range([padding.left, width - padding.right]).nice()
+    const groups = [
+        {
+            key: 'views',
+            label: 'Views',
+            color: '#00cbff',
+            values: data.map((point) => point.views || 0),
+        },
+        {
+            key: 'shares',
+            label: 'Shares',
+            color: '#f59e0b',
+            values: data.map((point) => point.shares || 0),
+        },
+    ]
+    const yScale = scaleBand<string>()
+        .domain(groups.map((group) => group.label))
+        .range([padding.top, padding.top + innerHeight])
+        .paddingInner(0.34)
+        .paddingOuter(0.16)
+    const thresholds = ticks(xScale.domain()[0], xScale.domain()[1], 48)
+    const bandwidth = yScale.bandwidth()
+    const densityHeight = Math.max(36, bandwidth * 0.82)
+    const bandwidthEstimate = Math.max((xScale.domain()[1] - xScale.domain()[0]) / 18, 1)
+    const densities = groups.map((group) => ({
+        ...group,
+        density: kernelDensityEstimator(kernelEpanechnikov(bandwidthEstimate), thresholds)(group.values),
+    }))
+    const maxDensity = max(densities.flatMap((group) => group.density.map((point) => point[1]))) || 1
+    const ridgeScale = scaleLinear().domain([0, maxDensity]).range([0, densityHeight])
+    const areaGenerator = area<[number, number]>()
+        .curve(curveBasis)
+        .x((point) => xScale(point[0]))
+        .y0(() => 0)
+        .y1((point) => -ridgeScale(point[1]))
+    const lineGenerator = line<[number, number]>()
+        .curve(curveBasis)
+        .x((point) => xScale(point[0]))
+        .y((point) => -ridgeScale(point[1]))
+    const xTicks = xScale.ticks(5)
+    const baselineFor = (label: string) => (yScale(label) || padding.top) + bandwidth
 
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-full w-full max-w-[780px] overflow-visible"
+            className="block h-full w-full overflow-visible"
             role="img"
-            aria-label="Views and shares over time"
+            aria-label="Ridgeline distribution chart for views and shares"
         >
             <defs>
-                <linearGradient id="dash_bar_views" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="dash_ridge_views" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#00cbff" stopOpacity="0.85" />
-                    <stop offset="100%" stopColor="#00cbff" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="#00cbff" stopOpacity="0.08" />
+                </linearGradient>
+                <linearGradient id="dash_ridge_shares" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.08" />
                 </linearGradient>
             </defs>
 
             <text x={padding.left} y={18} fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="600">
-                Views
+                Distribution
             </text>
-            <g transform={`translate(${width - padding.right - 148} 8)`}>
+            <g transform={`translate(${width - padding.right - 144} 8)`}>
                 <rect width="10" height="10" rx="3" fill="#00cbff" opacity="0.75" />
                 <text x="16" y="10" fill="hsl(var(--muted-foreground))" fontSize="12">Views</text>
-                <line x1="70" x2="84" y1="5" y2="5" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+                <rect x="70" width="10" height="10" rx="3" fill="#f59e0b" opacity="0.75" />
                 <text x="90" y="10" fill="hsl(var(--muted-foreground))" fontSize="12">Shares</text>
             </g>
 
-            {yTicks.map((tick) => {
-                const y = yFor(tick)
+            {xTicks.map((tick) => (
+                <g key={tick}>
+                    <line
+                        x1={xScale(tick)}
+                        x2={xScale(tick)}
+                        y1={padding.top + 12}
+                        y2={padding.top + innerHeight}
+                        stroke="hsl(var(--border))"
+                        strokeDasharray="4 8"
+                        strokeOpacity="0.55"
+                    />
+                    <text
+                        x={xScale(tick)}
+                        y={height - 18}
+                        textAnchor="middle"
+                        fill="hsl(var(--muted-foreground))"
+                        fontSize="12"
+                    >
+                        {formatAxisValue(tick)}
+                    </text>
+                </g>
+            ))}
+
+            {densities.map((group) => {
+                const baseline = baselineFor(group.label)
+                const fillId = group.key === 'views' ? 'dash_ridge_views' : 'dash_ridge_shares'
                 return (
-                    <g key={tick}>
+                    <g key={group.key} transform={`translate(0 ${baseline})`}>
                         <line
                             x1={padding.left}
                             x2={width - padding.right}
-                            y1={y}
-                            y2={y}
+                            y1="0"
+                            y2="0"
                             stroke="hsl(var(--border))"
-                            strokeDasharray={tick === 0 ? undefined : '4 6'}
-                            strokeOpacity={tick === 0 ? 0.9 : 0.65}
+                            strokeOpacity="0.8"
+                        />
+                        <path
+                            d={areaGenerator(group.density) || undefined}
+                            fill={`url(#${fillId})`}
+                            stroke="none"
+                        />
+                        <path
+                            d={lineGenerator(group.density) || undefined}
+                            fill="none"
+                            stroke={group.color}
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
                         />
                         <text
-                            x={padding.left - 12}
-                            y={y + 4}
+                            x={padding.left - 16}
+                            y="-4"
                             textAnchor="end"
-                            fill="hsl(var(--muted-foreground))"
-                            fontSize="12"
+                            fill="hsl(var(--foreground))"
+                            fontSize="13"
+                            fontWeight="600"
                         >
-                            {formatAxisValue(tick)}
+                            {group.label}
                         </text>
+                        <title>{`${group.label}: ${group.values.join(', ')}`}</title>
                     </g>
                 )
             })}
 
-            {data.map((point, index) => (
-                <g key={`${point.date}-${index}`}>
-                    <rect
-                        x={xFor(index) - barWidth / 2}
-                        y={yFor(point.views || 0)}
-                        width={barWidth}
-                        height={Math.max(1, baseline - yFor(point.views || 0))}
-                        rx="6"
-                        fill="url(#dash_bar_views)"
-                    >
-                        <title>{`${point.name || point.date}: ${point.views || 0} views, ${point.shares || 0} shares`}</title>
-                    </rect>
-                    {index % labelStep === 0 || index === data.length - 1 ? (
-                        <text
-                            x={xFor(index)}
-                            y={height - 16}
-                            textAnchor="middle"
-                            fill="hsl(var(--muted-foreground))"
-                            fontSize="12"
-                        >
-                            {point.name || point.date}
-                        </text>
-                    ) : null}
-                </g>
-            ))}
-
-            <line x1={padding.left} x2={padding.left} y1={padding.top} y2={baseline} stroke="hsl(var(--border))" />
-            <line x1={padding.left} x2={width - padding.right} y1={baseline} y2={baseline} stroke="hsl(var(--border))" />
-            {data.length > 0 && (
-                <path d={linePath('shares')} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            )}
-            {data.map((point, index) => (
-                <circle
-                    key={`${point.date}-${index}-share`}
-                    cx={xFor(index)}
-                    cy={yFor(point.shares || 0)}
-                    r="3.5"
-                    fill="#f59e0b"
-                    stroke="hsl(var(--background))"
-                    strokeWidth="2"
-                />
-            ))}
+            <line
+                x1={padding.left}
+                x2={width - padding.right}
+                y1={padding.top + innerHeight}
+                y2={padding.top + innerHeight}
+                stroke="hsl(var(--border))"
+            />
+            <text
+                x={width - padding.right}
+                y={height - 4}
+                textAnchor="end"
+                fill="hsl(var(--muted-foreground))"
+                fontSize="11"
+            >
+                event count
+            </text>
         </svg>
     )
 }
 
-function niceMax(value: number) {
-    if (value <= 1) return 1
-    const power = 10 ** Math.floor(Math.log10(value))
-    const normalized = value / power
-    const rounded = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
-    return rounded * power
+function kernelDensityEstimator(kernel: (value: number) => number, thresholds: number[]) {
+    return (values: number[]) =>
+        thresholds.map((threshold) => [
+            threshold,
+            values.reduce((sum, value) => sum + kernel(threshold - value), 0) / Math.max(1, values.length),
+        ] as [number, number])
+}
+
+function kernelEpanechnikov(bandwidth: number) {
+    return (value: number) => {
+        const scaled = value / bandwidth
+        return Math.abs(scaled) <= 1 ? (0.75 * (1 - scaled * scaled)) / bandwidth : 0
+    }
 }
 
 function formatAxisValue(value: number) {

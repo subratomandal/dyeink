@@ -100,13 +100,13 @@ export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeMod
                         <div className="mb-10 text-center">
                             <h3
                                 id="subscribe-modal-title"
-                                className="bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text font-display text-[1.8rem] font-extrabold leading-tight tracking-[-0.03em] text-transparent"
+                                className="font-display text-[1.65rem] font-semibold leading-tight tracking-[-0.025em] text-foreground"
                             >
                                 Stay in the loop
                             </h3>
-                            <p className="mx-auto mt-3 max-w-[95%] text-[0.95rem] leading-relaxed text-muted-foreground">
-                                Receive clarity and silence directly to your inbox.{' '}
-                                <span className="font-medium text-foreground">No spam, ever.</span>
+                            <p className="mx-auto mt-3 max-w-[90%] text-[0.92rem] leading-relaxed text-muted-foreground">
+                                Get new posts by email.{' '}
+                                <span className="font-medium text-foreground">No spam.</span>
                             </p>
                         </div>
 

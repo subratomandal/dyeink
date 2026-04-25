@@ -316,10 +316,11 @@ function BlogSidebar({
                 {slug ? (
                     <Link
                         to="/blog"
-                        className="sidebar-link"
-                        style={{ fontSize: '0.95rem', lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                        className="sidebar-icon-link"
+                        aria-label="Back to all posts"
+                        title="Back to all posts"
                     >
-                        <ArrowLeft size={16} /> All Posts
+                        <ArrowLeft size={18} />
                     </Link>
                 ) : null}
 
@@ -583,6 +584,24 @@ function BlogStyle() {
             .sidebar-link:hover {
                 color: var(--text-primary);
                 text-decoration: underline;
+            }
+            .sidebar-icon-link {
+                width: 2rem;
+                height: 2rem;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--text-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 999px;
+                text-decoration: none;
+                transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.2s;
+            }
+            .sidebar-icon-link:hover {
+                color: var(--text-primary);
+                border-color: var(--text-primary);
+                background: var(--bg-secondary);
+                transform: translateX(-1px);
             }
             .post-content a {
                 color: var(--text-primary);
