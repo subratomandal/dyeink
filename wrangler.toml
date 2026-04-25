@@ -33,6 +33,16 @@ bucket_name = "dyeink-images"
 # dashboard stays populated. Set to "off" after moving stats reads fully to
 # an analytics backend if you want zero D1 writes from public view/share events.
 D1_HIT_ROLLUPS = "on"
+# Optional newsletter sending via Cloudflare Email Service.
+# Requires Workers Paid plan, an onboarded Email Service domain, and the
+# send_email binding below. Leave commented to keep free/basic deploys working.
+# SITE_URL = "https://your-domain.com"
+# EMAIL_FROM = "newsletter@your-domain.com"
+# EMAIL_FROM_NAME = "DyeInk"
+
+# [[send_email]]
+# name = "EMAIL"
+# allowed_sender_addresses = ["newsletter@your-domain.com"]
 
 # Analytics Engine support exists in the Worker code but is intentionally not
 # bound by default because accounts must enable it first. If you enable it in

@@ -140,6 +140,8 @@
   html {
     font-size: 16px;
     scroll-behavior: smooth;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
   }
 
   #root {
@@ -148,6 +150,7 @@
     flex-direction: column;
     position: relative;
     z-index: 1;
+    overflow-x: clip;
   }
 
   /* Hide native scrollbars globally (preserved from prior design) */
@@ -243,6 +246,40 @@
   .skeleton-shimmer::after {
     animation: none;
     display: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 15.5px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font-size: 1rem;
+  }
+
+  a,
+  button,
+  input,
+  textarea,
+  select {
+    touch-action: manipulation;
   }
 }
 
@@ -362,6 +399,35 @@
 .post-content strong {
   color: var(--text-primary) !important;
   font-weight: 700 !important;
+}
+
+@media (max-width: 640px) {
+  .post-content {
+    font-size: 0.98rem;
+    line-height: 1.75;
+  }
+
+  .post-content h1 { font-size: 1.85em !important; }
+  .post-content h2 { font-size: 1.55em !important; }
+  .post-content h3 { font-size: 1.3em !important; }
+  .post-content h4 { font-size: 1.15em !important; }
+
+  .post-content h1,
+  .post-content h2,
+  .post-content h3,
+  .post-content h4,
+  .post-content h5,
+  .post-content h6 {
+    margin-top: 1.45rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .post-content blockquote,
+  .post-content ul,
+  .post-content ol,
+  .post-content pre {
+    margin: 1rem 0 !important;
+  }
 }
 
 /* Editor full-page styles */

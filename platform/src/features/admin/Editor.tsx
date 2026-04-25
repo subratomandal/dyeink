@@ -538,14 +538,14 @@ export default function Editor() {
                         grid-template-areas:
                             "start actions"
                             "tools tools" !important;
-                        gap: 0.6rem !important;
-                        padding-left: 0.75rem !important;
-                        padding-right: 0.75rem !important;
+                        gap: 0.55rem !important;
+                        padding: 0.7rem 0.85rem 0.65rem !important;
                     }
                     .editor-nav-start { grid-area: start; min-width: 0; }
                     .editor-nav-actions { grid-area: actions; }
                     .editor-nav-actions button {
                         min-width: 0 !important;
+                        min-height: 42px !important;
                         padding-left: 1rem !important;
                         padding-right: 1rem !important;
                     }
@@ -553,11 +553,13 @@ export default function Editor() {
                         grid-area: tools;
                         justify-content: flex-start !important;
                         margin: 0 -0.25rem;
-                        padding: 0.15rem 0.25rem 0.05rem;
+                        padding: 0.15rem 0.25rem 0;
+                        scroll-snap-type: x proximity;
                     }
                     .editor-toolbar-scroll button {
-                        width: 40px !important;
-                        height: 40px !important;
+                        width: 42px !important;
+                        height: 42px !important;
+                        scroll-snap-align: start;
                     }
                     .editor-toolbar-scroll [data-orientation="vertical"] {
                         margin-left: 0.15rem !important;
@@ -566,11 +568,16 @@ export default function Editor() {
                     .editor-body {
                         padding-left: 1rem !important;
                         padding-right: 1rem !important;
-                        padding-top: 2.5rem !important;
+                        padding-top: 1.75rem !important;
                     }
-                    .editor-title-editable { font-size: 2rem !important; }
-                    .editor-title-editable:empty:before { font-size: 2rem !important; }
-                    .editor-content-editable { font-size: 1rem !important; min-height: 50vh !important; padding-bottom: 200px !important; }
+                    .editor-title-editable { font-size: clamp(2rem, 10vw, 2.75rem) !important; line-height: 1.05 !important; }
+                    .editor-title-editable:empty:before { font-size: clamp(2rem, 10vw, 2.75rem) !important; }
+                    .editor-content-editable {
+                        font-size: 1.04rem !important;
+                        line-height: 1.72 !important;
+                        min-height: 52vh !important;
+                        padding-bottom: 7rem !important;
+                    }
                 }
             `}</style>
         </div>

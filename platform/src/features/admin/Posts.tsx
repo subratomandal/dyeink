@@ -50,10 +50,10 @@ export default function Posts() {
     }
 
     return (
-        <div className="mx-auto max-w-5xl pb-16">
+        <div className="posts-page mx-auto max-w-5xl pb-16">
             <div className="mb-8 sm:mb-12">
-                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Published Posts</h1>
-                <p className="mt-2 text-base text-muted-foreground sm:text-lg">Manage your live content.</p>
+                <h1 className="m-0 font-heading text-[2rem] font-semibold leading-tight sm:text-4xl">Published Posts</h1>
+                <p className="mt-2 text-sm text-muted-foreground sm:text-lg">Manage your live content.</p>
             </div>
 
             {showLoader ? (
@@ -75,7 +75,7 @@ export default function Posts() {
                         {filteredPosts.map((post, index) => (
                             <article
                                 key={post.id}
-                                className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/10 md:grid-cols-[minmax(0,1fr)_130px_150px_92px] md:items-center md:px-5"
+                                className="post-row grid gap-3 px-4 py-4 transition-colors hover:bg-muted/10 md:grid-cols-[minmax(0,1fr)_130px_150px_92px] md:items-center md:gap-4 md:px-5"
                             >
                                 <div className="min-w-0">
                                     <div className="mb-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -83,7 +83,7 @@ export default function Posts() {
                                     </div>
                                     <Link
                                         to={`/admin/posts/${post.id}/edit`}
-                                        className="block truncate font-heading text-lg font-medium leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
+                                        className="post-title-link block font-heading text-lg font-medium leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
                                         title={post.title}
                                     >
                                         {post.title}
@@ -109,7 +109,7 @@ export default function Posts() {
                                     </time>
                                 </div>
 
-                                <div className="flex justify-end gap-2">
+                                <div className="post-actions flex justify-end gap-2">
                                     <Button asChild size="icon" variant="ghost" className="h-10 w-10 rounded-full text-muted-foreground hover:text-foreground md:h-8 md:w-8">
                                         <Link to={`/admin/posts/${post.id}/edit`} aria-label={`Edit ${post.title}`}>
                                             <SquarePen className="h-4 w-4" />
@@ -155,6 +155,29 @@ export default function Posts() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <style>{`
+                @media (max-width: 767px) {
+                    .posts-page {
+                        padding-bottom: 2rem !important;
+                    }
+                    .post-row {
+                        border-radius: 1rem;
+                        padding: 1rem 0.25rem !important;
+                    }
+                    .post-title-link {
+                        display: -webkit-box !important;
+                        overflow: hidden;
+                        -webkit-box-orient: vertical;
+                        -webkit-line-clamp: 2;
+                        font-size: 1.05rem !important;
+                        line-height: 1.18 !important;
+                    }
+                    .post-actions {
+                        justify-content: flex-start !important;
+                        padding-top: 0.15rem;
+                    }
+                }
+            `}</style>
         </div>
     )
 }

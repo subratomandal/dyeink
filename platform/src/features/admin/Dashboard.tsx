@@ -11,11 +11,11 @@ import { formatDateKey, formatDateShort } from '@/lib/date'
 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
-        <div className="flex-1 py-6">
+        <div className="dashboard-stat flex-1 py-6">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {label}
             </div>
-            <div className="text-3xl font-bold text-foreground">{value}</div>
+            <div className="text-3xl font-bold leading-none text-foreground">{value}</div>
         </div>
     )
 }
@@ -64,11 +64,11 @@ export default function Dashboard() {
     return (
         <div className="animate-fade-in pb-16">
             <div className="mb-8 flex items-center justify-between">
-                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Dashboard</h1>
+                <h1 className="m-0 font-heading text-[2rem] font-semibold leading-tight sm:text-4xl">Dashboard</h1>
             </div>
 
             <section className="mb-12">
-                <h2 className="mb-6 text-xl font-semibold text-muted-foreground">Analytics</h2>
+                <h2 className="mb-6 text-lg font-semibold text-muted-foreground sm:text-xl">Analytics</h2>
 
                 <div className="mb-8 flex gap-8 dashboard-stats-row">
                     <Stat label="Total Views" value={(stats?.totalViews || 0).toLocaleString()} />
@@ -77,8 +77,8 @@ export default function Dashboard() {
                 </div>
 
                 <Card className="overflow-hidden border-border bg-transparent shadow-none">
-                    <CardContent className="px-0 py-4 sm:py-6">
-                        <div className="dashboard-chart-frame h-[320px] w-full min-w-0 overflow-x-auto overflow-y-hidden sm:h-[390px]">
+                    <CardContent className="px-0 py-3 sm:py-6">
+                        <div className="dashboard-chart-frame h-[280px] w-full min-w-0 overflow-hidden sm:h-[390px]">
                             {!ready || graphData.length === 0 ? (
                                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                                     {!ready ? null : 'No stats recorded yet'}
@@ -101,8 +101,8 @@ export default function Dashboard() {
                         className="block no-underline"
                     >
                         <Card className="border-border bg-transparent shadow-none transition-colors hover:border-foreground">
-                            <CardContent className="p-6">
-                                <h3 className="mb-4 break-words font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
+                            <CardContent className="p-5 sm:p-6">
+                                <h3 className="mb-4 break-words font-heading text-[1.35rem] font-normal leading-tight tracking-tight text-foreground sm:text-2xl">
                                     {dashboardStats.latestPost.title}
                                 </h3>
                                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -132,10 +132,29 @@ export default function Dashboard() {
 
             <style>{`
                 @media (max-width: 640px) {
-                    .dashboard-stats-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 1rem !important; }
-                    .dashboard-stats-row > div { padding: 0.5rem 0 !important; }
+                    .dashboard-stats-row {
+                        display: grid !important;
+                        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                        gap: 0.65rem !important;
+                        margin-bottom: 1.25rem !important;
+                    }
+                    .dashboard-stat {
+                        min-width: 0;
+                        padding: 0.2rem 0 !important;
+                    }
+                    .dashboard-stat > div:first-child {
+                        min-height: 2.1em;
+                        font-size: 0.62rem !important;
+                        letter-spacing: 0.08em !important;
+                    }
+                    .dashboard-stat > div:last-child {
+                        font-size: clamp(1.55rem, 8vw, 2.1rem) !important;
+                    }
+                    .dashboard-chart-frame {
+                        height: 270px !important;
+                    }
                     .dashboard-chart-frame svg {
-                        min-width: 760px;
+                        min-width: 0 !important;
                     }
                 }
             `}</style>
@@ -200,6 +219,7 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="xMidYMid meet"
             className="block h-full w-full overflow-visible"
             role="img"
             aria-label="Combined analytics chart for views and shares over time"

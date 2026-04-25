@@ -146,13 +146,13 @@ export default function Settings() {
     if (settingsLoading && !settings) return <SettingsSkeleton />
 
     return (
-        <div className="pb-16 text-foreground">
+        <div className="settings-page pb-16 text-foreground">
             <div className="mb-8 flex items-center justify-between">
-                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Settings</h1>
+                <h1 className="m-0 font-heading text-[2rem] font-semibold leading-tight sm:text-4xl">Settings</h1>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
-                <TabsList className="mb-6 w-full sm:w-auto">
+                <TabsList className="settings-tabs mb-6 w-full sm:w-auto">
                     <TabsTrigger value="basics">Basics</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="danger" className="data-[state=active]:text-red-500">
@@ -377,6 +377,29 @@ export default function Settings() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <style>{`
+                @media (max-width: 640px) {
+                    .settings-page {
+                        padding-bottom: 2rem !important;
+                    }
+                    .settings-tabs {
+                        height: auto !important;
+                        gap: 0.25rem;
+                        padding: 0.25rem !important;
+                    }
+                    .settings-tabs button {
+                        min-height: 40px;
+                        flex: 1 1 0;
+                        padding-left: 0.65rem !important;
+                        padding-right: 0.65rem !important;
+                        font-size: 0.82rem !important;
+                    }
+                    .settings-page [data-slot="card"],
+                    .settings-page .rounded-xl.border {
+                        border-radius: 1rem !important;
+                    }
+                }
+            `}</style>
         </div>
     )
 }

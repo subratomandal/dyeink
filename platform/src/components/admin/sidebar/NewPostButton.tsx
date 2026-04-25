@@ -75,11 +75,12 @@ export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void 
                 }
                 @media (max-width: 640px) {
                     .new-post-btn {
-                        padding: 0.5rem !important;
+                        flex: 0 0 42px !important;
+                        padding: 0 !important;
                     }
                     .new-post-btn .magic-button {
-                        width: 44px !important;
-                        height: 44px !important;
+                        width: 42px !important;
+                        height: 42px !important;
                         padding: 0 !important;
                     }
                     .new-post-btn .magic-text-full {
@@ -87,7 +88,7 @@ export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void 
                     }
                     .new-post-btn .magic-text-short {
                         display: inline !important;
-                        font-size: 0.65rem;
+                        font-size: 0.62rem;
                         letter-spacing: 0;
                     }
                 }

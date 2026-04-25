@@ -26,8 +26,12 @@ type Bindings = {
   IMAGES: R2Bucket
   ASSETS: Fetcher
   ANALYTICS?: AnalyticsEngineDataset
+  EMAIL?: SendEmailBinding
   APP_PASSWORD?: string // optional: seeds the admin row on first deploy if present
   FRONTEND_ORIGIN?: string
+  SITE_URL?: string
+  EMAIL_FROM?: string
+  EMAIL_FROM_NAME?: string
   R2_PUBLIC_URL?: string
   D1_HIT_ROLLUPS?: string
 }
@@ -58,6 +62,20 @@ app.use('/api/*', (c, next) => {
 // ---------- Auth middleware ----------
 
 type AppCtx = Context<{ Bindings: Bindings; Variables: Variables }>
+
+type EmailMessageBuilder = {
+  to: string | string[]
+  from: string | { email: string; name: string }
+  subject: string
+  html?: string
+  text?: string
+  replyTo?: string | { email: string; name: string }
+  headers?: Record<string, string>
+}
+
+type SendEmailBinding = {
+  send(message: EmailMessageBuilder): Promise<{ messageId?: string }>
+}
 
 const PUBLIC_JSON_CACHE = 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
 const PUBLIC_ARTIFACT_PREFIX = 'public'
@@ -570,6 +588,9 @@ app.post('/api/posts', requireAuth, async (c) => {
     .bind(id)
     .first<PostRow>()
   c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
+  if (row?.published) {
+    c.executionCtx.waitUntil(sendPublishedPostEmails(c, row).catch((err) => console.error(err)))
+  }
   return c.json(serializePost(row!), 201)
 })
 
@@ -651,6 +672,9 @@ app.put('/api/posts/:id', requireAuth, async (c) => {
     .bind(id)
     .first<PostRow>()
   c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
+  if (row?.published && !existing.published) {
+    c.executionCtx.waitUntil(sendPublishedPostEmails(c, row).catch((err) => console.error(err)))
+  }
   return c.json(serializePost(row!))
 })
 
@@ -711,6 +735,120 @@ function serializeSettings(r: SettingsRow | null) {
 async function getSettingsPayload(db: D1Database) {
   const row = await db.prepare('SELECT * FROM site_settings WHERE id = 1').first<SettingsRow>()
   return serializeSettings(row)
+}
+
+function isEmailServiceReady(env: Bindings) {
+  return !!env.EMAIL && !!env.EMAIL_FROM && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.EMAIL_FROM)
+}
+
+function getBaseUrl(c: AppCtx) {
+  const configured = c.env.SITE_URL || c.env.FRONTEND_ORIGIN
+  if (configured && configured !== '*') return configured.replace(/\/$/, '')
+  return new URL(c.req.url).origin
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buildEmailFrom(settings: SettingsRow | null, env: Bindings) {
+  const name = env.EMAIL_FROM_NAME || settings?.site_name || 'DyeInk'
+  return { email: env.EMAIL_FROM!, name }
+}
+
+function buildUnsubscribeUrl(baseUrl: string, subscriberId: string) {
+  return `${baseUrl}/api/unsubscribe?id=${encodeURIComponent(subscriberId)}`
+}
+
+async function sendNewsletterEmail(
+  env: Bindings,
+  message: Omit<EmailMessageBuilder, 'from'> & { from?: EmailMessageBuilder['from'] },
+) {
+  if (!isEmailServiceReady(env)) return
+  await env.EMAIL!.send({
+    ...message,
+    from: message.from || env.EMAIL_FROM!,
+  })
+}
+
+async function sendWelcomeEmail(c: AppCtx, email: string, subscriberId: string) {
+  if (!isEmailServiceReady(c.env)) return
+
+  const settings = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
+  const siteName = settings?.site_name || 'DyeInk'
+  const baseUrl = getBaseUrl(c)
+  const unsubscribeUrl = buildUnsubscribeUrl(baseUrl, subscriberId)
+  const safeSiteName = escapeHtml(siteName)
+
+  await sendNewsletterEmail(c.env, {
+    to: email,
+    from: buildEmailFrom(settings, c.env),
+    subject: `Subscribed to ${siteName}`,
+    html: `
+      <p>You are subscribed to <strong>${safeSiteName}</strong>.</p>
+      <p>New posts will arrive here when they are published.</p>
+      <p><a href="${baseUrl}/blog">Read the blog</a></p>
+      <p style="color:#666;font-size:12px"><a href="${unsubscribeUrl}">Unsubscribe</a></p>
+    `,
+    text: `You are subscribed to ${siteName}.\n\nRead the blog: ${baseUrl}/blog\n\nUnsubscribe: ${unsubscribeUrl}`,
+    headers: {
+      'List-Unsubscribe': `<${unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  })
+}
+
+async function sendPublishedPostEmails(c: AppCtx, post: PostRow) {
+  if (!isEmailServiceReady(c.env)) return
+
+  const settings = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
+  if (!settings?.newsletter_enabled) return
+
+  const { results: subscribers } = await c.env.DB.prepare(
+    'SELECT id, email FROM subscribers WHERE active = 1 ORDER BY created_at ASC',
+  ).all<{ id: string; email: string }>()
+  if (subscribers.length === 0) return
+
+  const siteName = settings.site_name || 'DyeInk'
+  const baseUrl = getBaseUrl(c)
+  const postUrl = `${baseUrl}/blog/${encodeURIComponent(post.slug)}`
+  const preview = buildPostPreview(post.excerpt, post.content)
+  const safeTitle = escapeHtml(post.title)
+  const safeSiteName = escapeHtml(siteName)
+  const safePreview = escapeHtml(preview)
+
+  for (let i = 0; i < subscribers.length; i += 10) {
+    const chunk = subscribers.slice(i, i + 10)
+    await Promise.allSettled(
+      chunk.map((subscriber) => {
+        const unsubscribeUrl = buildUnsubscribeUrl(baseUrl, subscriber.id)
+        return sendNewsletterEmail(c.env, {
+          to: subscriber.email,
+          from: buildEmailFrom(settings, c.env),
+          subject: `New post: ${post.title}`,
+          html: `
+            <p style="color:#666">${safeSiteName}</p>
+            <h1>${safeTitle}</h1>
+            ${safePreview ? `<p>${safePreview}</p>` : ''}
+            <p><a href="${postUrl}">Read the post</a></p>
+            <p style="color:#666;font-size:12px"><a href="${unsubscribeUrl}">Unsubscribe</a></p>
+          `,
+          text: `${siteName}\n\n${post.title}\n\n${preview ? `${preview}\n\n` : ''}Read the post: ${postUrl}\n\nUnsubscribe: ${unsubscribeUrl}`,
+          headers: {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
+        })
+      }),
+    )
+  }
 }
 
 async function putJsonArtifact(bucket: R2Bucket, key: string, value: unknown) {
@@ -990,18 +1128,52 @@ app.post('/api/subscribe', async (c) => {
       await c.env.DB.prepare('UPDATE subscribers SET active = 1 WHERE id = ?')
         .bind(existing.id)
         .run()
+      c.executionCtx.waitUntil(sendWelcomeEmail(c, email, existing.id).catch((err) => console.error(err)))
       c.header('Cache-Control', 'no-store, max-age=0')
-      return c.json({ ok: true, message: 'Subscription reactivated' })
+      return c.json({
+        ok: true,
+        message: 'Subscription reactivated',
+        emailDelivery: isEmailServiceReady(c.env) ? 'queued' : 'disabled',
+      })
     }
     c.header('Cache-Control', 'no-store, max-age=0')
     return c.json({ ok: true, message: 'Already subscribed' })
   }
 
+  const subscriberId = randomToken(12)
   await c.env.DB.prepare('INSERT INTO subscribers (id, email) VALUES (?, ?)')
-    .bind(randomToken(12), email)
+    .bind(subscriberId, email)
+    .run()
+  c.executionCtx.waitUntil(sendWelcomeEmail(c, email, subscriberId).catch((err) => console.error(err)))
+  c.header('Cache-Control', 'no-store, max-age=0')
+  return c.json({
+    ok: true,
+    message: 'Subscribed',
+    emailDelivery: isEmailServiceReady(c.env) ? 'queued' : 'disabled',
+  })
+})
+
+async function unsubscribeById(c: AppCtx, id: string | undefined) {
+  const subscriberId = id?.trim()
+  if (!subscriberId) return c.json({ error: 'Missing unsubscribe token' }, 400)
+
+  await c.env.DB.prepare('UPDATE subscribers SET active = 0 WHERE id = ?')
+    .bind(subscriberId)
     .run()
   c.header('Cache-Control', 'no-store, max-age=0')
-  return c.json({ ok: true, message: 'Subscribed' })
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribed</title></head><body style="font-family:system-ui,sans-serif;padding:40px;line-height:1.5"><h1>Unsubscribed</h1><p>You will no longer receive email updates from this blog.</p><p><a href="/blog">Return to blog</a></p></body></html>`,
+    { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store, max-age=0' } },
+  )
+}
+
+app.get('/api/unsubscribe', async (c) => {
+  return unsubscribeById(c, c.req.query('id'))
+})
+
+app.post('/api/unsubscribe', async (c) => {
+  const body = await c.req.json<{ id?: string }>().catch(() => ({}))
+  return unsubscribeById(c, body.id || c.req.query('id'))
 })
 
 app.get('/api/subscribers', requireAuth, async (c) => {

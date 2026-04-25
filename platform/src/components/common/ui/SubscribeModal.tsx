@@ -32,11 +32,14 @@ export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeMod
 
     const handleSubscribe = async (e: FormEvent) => {
         e.preventDefault()
+        const trimmedEmail = email.trim()
+        if (!trimmedEmail) return
+
         setLoading(true)
         try {
-            await apiClient.post('/subscribe', { email: email.trim(), blogId })
+            const response = await apiClient.post<{ message?: string }>('/subscribe', { email: trimmedEmail, blogId })
             setSuccess(true)
-            addToast({ type: 'success', message: 'Successfully subscribed!', duration: 3000 })
+            addToast({ type: 'success', message: response.data.message || 'Subscribed', duration: 3000 })
             setTimeout(() => {
                 onClose()
                 setSuccess(false)
@@ -139,6 +142,9 @@ export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeMod
                     .subscribe-modal-panel {
                         padding-left: 1.25rem !important;
                         padding-right: 1.25rem !important;
+                        padding-top: 2.75rem !important;
+                        padding-bottom: 1.5rem !important;
+                        border-radius: 22px !important;
                     }
                     .subscribe-modal-panel form .relative {
                         display: flex !important;
@@ -152,6 +158,10 @@ export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeMod
                         position: static !important;
                         width: 100% !important;
                         min-height: 44px !important;
+                    }
+                    .subscribe-modal-panel [aria-label="Close subscribe modal"] {
+                        width: 44px !important;
+                        height: 44px !important;
                     }
                 }
             `}</style>

@@ -5,12 +5,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 function StatCard({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
     return (
-        <div className="flex flex-col gap-2 py-6">
+        <div className="stats-card flex min-w-0 flex-col gap-2 py-6">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {icon && <span className="opacity-70">{icon}</span>}
                 {label}
             </div>
-            <div className="text-3xl font-bold text-foreground">{value}</div>
+            <div className="text-3xl font-bold leading-none text-foreground">{value}</div>
         </div>
     )
 }
@@ -25,13 +25,13 @@ export default function Stats() {
     if (showLoader) return <StatsSkeleton />
 
     return (
-        <div className="pb-16 text-foreground">
+        <div className="stats-page pb-16 text-foreground">
             <div className="mb-8 flex items-center justify-between">
-                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Stats</h1>
+                <h1 className="m-0 font-heading text-[2rem] font-semibold leading-tight sm:text-4xl">Stats</h1>
             </div>
 
             <Tabs defaultValue="traffic" className="animate-fade-in">
-                <TabsList className="mb-6 w-full sm:w-auto">
+                <TabsList className="stats-tabs mb-6 w-full sm:w-auto">
                     <TabsTrigger value="traffic">Traffic</TabsTrigger>
                     <TabsTrigger value="sharing">Sharing</TabsTrigger>
                 </TabsList>
@@ -57,6 +57,29 @@ export default function Stats() {
                     </div>
                 </TabsContent>
             </Tabs>
+            <style>{`
+                @media (max-width: 640px) {
+                    .stats-page {
+                        padding-bottom: 2rem !important;
+                    }
+                    .stats-tabs {
+                        height: auto !important;
+                        gap: 0.25rem;
+                        padding: 0.25rem !important;
+                    }
+                    .stats-tabs button {
+                        min-height: 40px;
+                        flex: 1 1 0;
+                    }
+                    .stats-card {
+                        padding-top: 0.75rem !important;
+                        padding-bottom: 0.75rem !important;
+                    }
+                    .stats-card > div:last-child {
+                        font-size: clamp(1.6rem, 8vw, 2.1rem) !important;
+                    }
+                }
+            `}</style>
         </div>
     )
 }

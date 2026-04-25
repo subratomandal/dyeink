@@ -132,13 +132,13 @@ export default function Landing() {
             </footer>
 
             <style>{`
-                @media (max-width: 499px) {
+                @media (max-width: 768px) {
                     .landing-theme-toggle {
                         top: 1rem !important;
                         right: 1rem !important;
                     }
                     .landing-page > nav {
-                        padding: 1rem 4.5rem 1rem 1rem !important;
+                        padding: 1rem 4.75rem 0.75rem 1rem !important;
                     }
                     .landing-page > nav > div:first-child {
                         width: 32px !important;
@@ -148,27 +148,30 @@ export default function Landing() {
                         margin-top: 0 !important;
                     }
                     .landing-page main h1 {
-                        font-size: clamp(2.6rem, 14vw, 4.4rem) !important;
-                        margin-bottom: 1rem !important;
+                        font-size: clamp(2.65rem, 13.25vw, 5.35rem) !important;
+                        margin-bottom: 1.1rem !important;
+                        line-height: 1.02 !important;
                     }
                     .landing-page main p {
-                        font-size: 1rem !important;
+                        font-size: clamp(1rem, 4vw, 1.12rem) !important;
                         max-width: 100% !important;
-                        padding: 0 0.5rem !important;
+                        padding: 0 !important;
+                        margin-bottom: 1.5rem !important;
                     }
                     .landing-page main {
-                        padding: 2rem 1rem 0 !important;
-                        min-height: min(720px, calc(100svh - 80px)) !important;
+                        padding: 1.5rem 1.125rem 0 !important;
+                        min-height: clamp(430px, 72svh, 620px) !important;
                     }
                     .landing-page section {
                         grid-template-columns: minmax(0, 1fr) !important;
-                        padding: 1.5rem 0.75rem 2.5rem 0.75rem !important;
-                        gap: 1rem !important;
+                        padding: 1.75rem 1rem 2.75rem !important;
+                        gap: 1.1rem !important;
                     }
                     .landing-page .neu-btn {
                         min-height: 44px !important;
                         padding-left: 1.1rem !important;
                         padding-right: 1.1rem !important;
+                        font-size: 0.95rem !important;
                     }
                     .landing-page footer {
                         padding: 1rem !important;

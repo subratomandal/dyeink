@@ -28,9 +28,10 @@
     opacity: 0;
 } 
 
-@media (max-width: 499px) {
+@media (max-width: 768px) {
     .pixel-card {
-        width: min(100%, 280px);
-        height: 260px;
+        width: min(100%, 320px);
+        height: 240px;
+        border-radius: 20px;
     }
 }
