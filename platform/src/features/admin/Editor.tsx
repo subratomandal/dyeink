@@ -394,7 +394,7 @@ export default function Editor() {
                         aria-label="Back"
                         className="flex h-10 w-10 items-center justify-center rounded-full p-0 leading-none [&_svg]:!size-6"
                     >
-                        <ChevronLeft className="!h-6 !w-6" />
+                        <ChevronLeft className="!h-6 !w-6 -translate-x-0.5" />
                     </Button>
                     {lastSaved && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

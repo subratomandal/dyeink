@@ -889,6 +889,7 @@ function BlogStyle() {
                 }
                 article {
                     align-items: stretch !important;
+                    border-bottom: none !important;
                     gap: 0.48rem !important;
                     padding-bottom: 0.76rem !important;
                     text-align: left !important;

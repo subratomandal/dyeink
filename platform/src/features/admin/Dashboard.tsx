@@ -151,10 +151,15 @@ export default function Dashboard() {
                         font-size: clamp(1.55rem, 8vw, 2.1rem) !important;
                     }
                     .dashboard-chart-frame {
-                        height: 270px !important;
+                        height: clamp(360px, 78vw, 430px) !important;
+                        margin-left: -0.35rem !important;
+                        width: calc(100% + 0.35rem) !important;
                     }
                     .dashboard-chart-frame svg {
+                        height: 100% !important;
                         min-width: 0 !important;
+                        transform: scale(1.08);
+                        transform-origin: left center;
                     }
                 }
             `}</style>
