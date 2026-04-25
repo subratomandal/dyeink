@@ -378,7 +378,7 @@ export default function Editor() {
                 </div>
             )}
 
-            <nav className="sticky top-0 z-50 grid grid-cols-[1fr_auto_1fr] items-center border-b bg-background px-6 py-3">
+            <nav className="sticky top-0 z-50 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-6 py-3">
                 <div className="flex items-center gap-3">
                     <Button
                         variant="outline"
@@ -396,7 +396,8 @@ export default function Editor() {
                     )}
                 </div>
 
-                <div className="flex items-center gap-1 overflow-x-auto pr-4 [scrollbar-width:none] [-ms-overflow-style:none]">
+                <div className="min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]">
+                    <div className="flex w-max items-center gap-1">
                     <ToolbarButton onClick={() => executeCommand('undo')} title="Undo">
                         <Undo className="h-4 w-4" />
                     </ToolbarButton>
@@ -449,6 +450,7 @@ export default function Editor() {
                     <ToolbarButton onClick={handleImage} title="Image">
                         <ImageIcon className="h-4 w-4" />
                     </ToolbarButton>
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-3">
@@ -468,7 +470,7 @@ export default function Editor() {
                     ref={titleRef}
                     contentEditable
                     className={cn(
-                        'editor-title-editable mb-4 w-full bg-transparent text-[3.5rem] font-bold leading-tight text-foreground outline-none',
+                        'editor-title-editable mb-4 w-full break-words bg-transparent text-[3.5rem] font-bold leading-tight text-foreground outline-none',
                     )}
                     data-placeholder="Title"
                     onInput={(e) => setTitle(e.currentTarget.innerText)}
@@ -485,7 +487,7 @@ export default function Editor() {
                 <div
                     ref={contentRef}
                     contentEditable
-                    className="editor-content-editable min-h-[60vh] w-full whitespace-pre-wrap bg-transparent text-lg leading-relaxed text-foreground outline-none"
+                    className="editor-content-editable min-h-[60vh] w-full break-words whitespace-pre-wrap bg-transparent text-lg leading-relaxed text-foreground outline-none"
                     data-placeholder="Start writing..."
                     onContextMenu={handleContextMenu}
                     onClick={handleContentClick}
@@ -520,6 +522,10 @@ export default function Editor() {
                 .editor-content-editable img { max-width: 100% !important; height: auto !important; border-radius: 0.5rem; margin: 1rem 0; display: block; }
                 .editor-content-editable a { color: hsl(var(--foreground)); text-decoration: underline; }
                 @media (max-width: 640px) {
+                    .editor-page nav {
+                        padding-left: 0.75rem !important;
+                        padding-right: 0.75rem !important;
+                    }
                     .editor-title-editable { font-size: 2rem !important; }
                     .editor-title-editable:empty:before { font-size: 2rem !important; }
                     .editor-content-editable { font-size: 1rem !important; min-height: 50vh !important; padding-bottom: 200px !important; }

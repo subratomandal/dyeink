@@ -5,9 +5,12 @@ export default function NewPostButton() {
         <div className="new-post-btn px-5 pb-6">
             <Link
                 to="/admin/posts/new"
+                aria-label="New post"
+                title="New post"
                 className="magic-button relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold text-white shadow-[0_0_10px_rgba(168,85,247,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
             >
-                <span className="magic-text">New Post</span>
+                <span className="magic-text magic-text-full">New Post</span>
+                <span className="magic-text magic-text-short" aria-hidden="true">New</span>
             </Link>
 
             <style>{`
@@ -54,15 +57,29 @@ export default function NewPostButton() {
                     letter-spacing: 0.02em;
                     transition: color 0.3s ease;
                 }
+                .magic-text-short {
+                    display: none;
+                }
                 .magic-button:hover .magic-text {
                     color: #ffffff;
                     background: none;
                     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 }
                 @media (max-width: 640px) {
-                    .new-post-btn .magic-text {
+                    .new-post-btn {
+                        padding: 0.5rem !important;
+                    }
+                    .new-post-btn .magic-button {
+                        width: 44px !important;
+                        height: 44px !important;
+                        padding: 0 !important;
+                    }
+                    .new-post-btn .magic-text-full {
+                        display: none !important;
+                    }
+                    .new-post-btn .magic-text-short {
                         display: inline !important;
-                        font-size: 0.72rem;
+                        font-size: 0.65rem;
                         letter-spacing: 0;
                     }
                 }

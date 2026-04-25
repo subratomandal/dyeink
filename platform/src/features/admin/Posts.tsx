@@ -64,27 +64,27 @@ export default function Posts() {
                     No published posts yet.
                 </div>
             ) : (
-                <div className="animate-fade-in">
-                    <div className="mb-3 hidden grid-cols-[minmax(0,1fr)_140px_150px_96px] items-center px-5 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-muted-foreground md:grid">
-                        <span>Title</span>
-                        <span>Status</span>
-                        <span>Date</span>
-                        <span className="text-right">Actions</span>
+                <section className="animate-fade-in overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="hidden grid-cols-[minmax(0,1fr)_120px_140px_92px] items-center border-b border-border bg-muted/25 px-5 py-3 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
+                        <div>Title</div>
+                        <div>Status</div>
+                        <div>Date</div>
+                        <div className="text-right">Actions</div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="divide-y divide-border">
                         {filteredPosts.map((post, index) => (
                             <article
                                 key={post.id}
-                                className="group grid gap-4 rounded-3xl border border-border/80 bg-card/75 p-4 shadow-[0_14px_50px_hsl(var(--foreground)/0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/30 hover:bg-card md:grid-cols-[minmax(0,1fr)_140px_150px_96px] md:items-center md:p-5"
+                                className="grid gap-3 px-4 py-4 transition-colors hover:bg-accent/35 md:grid-cols-[minmax(0,1fr)_120px_140px_92px] md:items-center md:px-5"
                             >
                                 <div className="min-w-0">
-                                    <div className="mb-1 font-mono text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                                        #{String(index + 1).padStart(2, '0')}
+                                    <div className="mb-1 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                        Published #{String(index + 1).padStart(2, '0')}
                                     </div>
                                     <Link
                                         to={`/admin/posts/${post.id}/edit`}
-                                        className="block max-w-full truncate font-heading text-xl font-semibold leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
+                                        className="block max-w-full truncate font-heading text-lg font-medium leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
                                         title={post.title}
                                     >
                                         {post.title}
@@ -92,28 +92,28 @@ export default function Posts() {
                                 </div>
 
                                 <div className="flex items-center justify-between gap-3 md:block">
-                                    <span className="font-mono text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground md:hidden">
+                                    <span className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted-foreground md:hidden">
                                         Status
                                     </span>
-                                    <Badge variant={post.published ? 'success' : 'warning'} className="rounded-full px-3 py-1">
+                                    <Badge variant={post.published ? 'success' : 'warning'} className="rounded-full px-2.5 py-0.5">
                                         {post.published ? 'Published' : 'Draft'}
                                     </Badge>
                                 </div>
 
                                 <div className="flex items-center justify-between gap-3 md:block">
-                                    <span className="font-mono text-[0.68rem] uppercase tracking-[0.2em] text-muted-foreground md:hidden">
+                                    <span className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted-foreground md:hidden">
                                         Date
                                     </span>
                                     <time
                                         dateTime={post.createdAt}
-                                        className="inline-flex rounded-full border border-border/80 bg-background/60 px-3 py-1 font-mono text-xs text-muted-foreground"
+                                        className="font-mono text-xs text-muted-foreground"
                                     >
                                         {formatDateShort(post.createdAt)}
                                     </time>
                                 </div>
 
                                 <div className="flex justify-end gap-2">
-                                    <Button asChild size="icon" variant="secondary" className="h-9 w-9 rounded-full">
+                                    <Button asChild size="icon" variant="secondary" className="h-8 w-8 rounded-full">
                                         <Link to={`/admin/posts/${post.id}/edit`} aria-label={`Edit ${post.title}`}>
                                             <Edit2 className="h-4 w-4" />
                                         </Link>
@@ -121,7 +121,7 @@ export default function Posts() {
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-9 w-9 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
+                                        className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
                                         onClick={() => setPostToDelete(post.id)}
                                         aria-label={`Delete ${post.title}`}
                                     >
@@ -131,7 +131,7 @@ export default function Posts() {
                             </article>
                         ))}
                     </div>
-                </div>
+                </section>
             )}
 
             <AlertDialog open={!!postToDelete} onOpenChange={(open) => !open && setPostToDelete(null)}>

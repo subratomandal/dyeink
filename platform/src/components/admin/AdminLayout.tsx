@@ -42,7 +42,7 @@ function SidebarLink({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
-        <div className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-foreground/90 first:mt-0">
+        <div data-section-label className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-foreground/90 first:mt-0">
             {children}
         </div>
     )
@@ -168,8 +168,8 @@ export default function AdminLayout() {
                     aside nav { align-items: center; }
                     aside nav a span,
                     aside button span,
-                    aside .new-post-btn .magic-text,
-                    aside [data-greeting] { display: none !important; }
+                    aside [data-greeting],
+                    aside [data-section-label] { display: none !important; }
                     aside nav a, aside button {
                         justify-content: center;
                         width: 44px; height: 44px; padding: 0;
@@ -177,10 +177,13 @@ export default function AdminLayout() {
                         margin: 0 auto;
                     }
                     main { margin-left: 70px !important; }
-                    main .mx-auto { padding: 2rem 1rem !important; }
+                    main .mx-auto { padding: 5rem 1rem 2rem !important; }
+                    main > .absolute.right-6.top-6 {
+                        top: 1rem !important;
+                        right: 1rem !important;
+                    }
                 }
             `}</style>
         </div>
     )
 }
-
