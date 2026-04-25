@@ -4,7 +4,6 @@ import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Share2 } from 'lucide-rea
 import DOMPurify from 'dompurify'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import SubscribeModal from '@/components/common/ui/SubscribeModal'
-import Skeleton from '@/components/common/ui/Skeleton'
 import { useToast } from '@/components/common/feedback/Toast'
 import { useCodeCopy } from '@/hooks/useCodeCopy'
 import { postService } from '@/services/postService'
@@ -67,7 +66,7 @@ export default function Blog() {
             try {
                 const [list, s] = await Promise.all([
                     postService.getPublicPosts(),
-                    settingsService.getSettings(),
+                    settingsService.getSettings({ preferFresh: true }),
                 ])
                 if (cancelled) return
                 setPosts(list)
@@ -150,7 +149,24 @@ export default function Blog() {
                 }}
             />
 
-            <div className="fixed right-6 top-6 z-50">
+            <div
+                className="blog-theme-toggle-wrapper"
+                style={{
+                    position: 'fixed',
+                    top: '1.5rem',
+                    right: '1.5rem',
+                    zIndex: 100,
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--bg-secondary)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                }}
+            >
                 <ThemeToggle />
             </div>
 
@@ -180,7 +196,7 @@ export default function Blog() {
 
                 <main ref={contentRef} style={{ paddingTop: '0.4rem' }}>
                     {loading || activePostLoading ? (
-                        <BlogLoadingState />
+                        <div style={{ padding: '2rem 0', color: 'var(--text-muted)' }}>Loading...</div>
                     ) : isEmpty ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
                             {searchTerm ? 'No posts match that search.' : 'No posts published yet.'}
@@ -260,7 +276,6 @@ function BlogSidebar({
     onSubscribe: () => void
 }) {
     const blogTitle = settings?.siteName || 'DyeInk'
-    const tagline = settings?.siteDescription?.trim()
     const visibleSocials = [
         { href: settings?.twitterLink, label: 'Follow on X / Twitter', icon: <XIcon /> },
         { href: settings?.linkedinLink, label: 'Connect on LinkedIn', icon: <Linkedin size={20} /> },
@@ -293,22 +308,6 @@ function BlogSidebar({
                     >
                         {loading ? 'DyeInk' : blogTitle}
                     </h1>
-                    {!loading && tagline ? (
-                        <p
-                            style={{
-                                margin: '0.75rem 0 0',
-                                color: 'var(--text-secondary)',
-                                fontFamily: "'Jost', sans-serif",
-                                fontSize: '0.96rem',
-                                fontWeight: 400,
-                                lineHeight: 1.5,
-                                maxWidth: '18rem',
-                                overflowWrap: 'anywhere',
-                            }}
-                        >
-                            {tagline}
-                        </p>
-                    ) : null}
                 </div>
             </div>
 
@@ -547,28 +546,6 @@ function formatHref(href: string) {
     return href.startsWith('http') ? href : `https://${href}`
 }
 
-function BlogLoadingState() {
-    return (
-        <div className="blog-loading-stack" aria-label="Loading posts">
-            {[0, 1, 2].map((index) => (
-                <div className="blog-loading-card" key={index}>
-                    <Skeleton className="h-5 w-24 rounded-full" />
-                    <Skeleton className="h-8 w-[72%] rounded-2xl" />
-                    <div className="space-y-3">
-                        <Skeleton className="h-4 w-full rounded-full" />
-                        <Skeleton className="h-4 w-[88%] rounded-full" />
-                        <Skeleton className="h-4 w-[62%] rounded-full" />
-                    </div>
-                    <div className="flex items-center justify-between pt-2">
-                        <Skeleton className="h-6 w-20 rounded-full" />
-                        <Skeleton className="h-5 w-28 rounded-full" />
-                    </div>
-                </div>
-            ))}
-        </div>
-    )
-}
-
 function htmlToPlainText(value: string) {
     return value
         .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -614,19 +591,6 @@ function BlogStyle() {
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 text-overflow: ellipsis;
-            }
-            .blog-loading-stack {
-                display: flex;
-                flex-direction: column;
-                gap: 3rem;
-                padding-top: 0.4rem;
-            }
-            .blog-loading-card {
-                display: flex;
-                flex-direction: column;
-                gap: 1rem;
-                padding-bottom: 2.5rem;
-                border-bottom: 1px dashed var(--border-color);
             }
             @media (max-width: 499px) {
                 div[style*="grid-template-columns"] {
@@ -685,11 +649,13 @@ function BlogStyle() {
                 article h2 {
                     font-size: 1.3rem !important;
                 }
-                div.fixed.right-6.top-6.z-50 {
+                .blog-theme-toggle-wrapper {
                     top: 1rem !important;
                     right: 1rem !important;
+                    width: 36px !important;
+                    height: 36px !important;
                 }
-                div.fixed.right-6.top-6.z-50 button {
+                .blog-theme-toggle-wrapper button {
                     width: 36px !important;
                     height: 36px !important;
                 }

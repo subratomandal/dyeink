@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
@@ -32,7 +31,6 @@ export default function Settings() {
     const [activeTab, setActiveTab] = useState('basics')
 
     const [siteName, setSiteName] = useState('')
-    const [siteDescription, setSiteDescription] = useState('')
     const [newsletterEnabled, setNewsletterEnabled] = useState(false)
     const [twitterLink, setTwitterLink] = useState('')
     const [linkedinLink, setLinkedinLink] = useState('')
@@ -65,7 +63,6 @@ export default function Settings() {
     useEffect(() => {
         if (!settings) return
         setSiteName(settings.siteName || '')
-        setSiteDescription(settings.siteDescription || '')
         setNewsletterEnabled(!!settings.newsletterEnabled)
         setTwitterLink(settings.twitterLink || '')
         setLinkedinLink(settings.linkedinLink || '')
@@ -81,7 +78,7 @@ export default function Settings() {
         try {
             const updated = await settingsService.saveSettings({
                 siteName,
-                siteDescription,
+                siteDescription: '',
                 newsletterEnabled,
                 twitterLink: twitterLink || null,
                 linkedinLink: linkedinLink || null,
@@ -174,19 +171,6 @@ export default function Settings() {
                                 value={siteName}
                                 onChange={(e) => setSiteName(e.target.value)}
                                 className="h-11"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="site-description" className="text-base font-semibold">
-                                Tagline
-                            </Label>
-                            <Textarea
-                                id="site-description"
-                                value={siteDescription}
-                                onChange={(e) => setSiteDescription(e.target.value)}
-                                rows={2}
-                                placeholder="A one-line description of your blog"
                             />
                         </div>
 

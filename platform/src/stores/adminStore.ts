@@ -62,7 +62,7 @@ export const useAdminStore = createNativeStore<AdminState>((set, get) => ({
         if (!force && settings && settingsLastFetched && now - settingsLastFetched < CACHE_DURATION) return
         set({ settingsLoading: true })
         try {
-            const fetched = await settingsService.getSettings()
+            const fetched = await settingsService.getSettings({ preferFresh: true })
             set({ settings: fetched, settingsLastFetched: Date.now(), settingsLoading: false })
         } catch (error) {
             console.error('Failed to fetch settings:', error)

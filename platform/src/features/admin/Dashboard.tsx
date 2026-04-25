@@ -94,10 +94,10 @@ export default function Dashboard() {
                         <Card className="transition-all hover:border-foreground hover:scale-[1.005]">
                             <CardContent className="p-6">
                                 <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
-                                <h3 className="mb-4 font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
+                                <h3 className="mb-4 break-words font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
                                     {dashboardStats.latestPost.title}
                                 </h3>
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                                     <span className="font-heading text-xs text-muted-foreground">
                                         {formatDateShort(dashboardStats.latestPost.createdAt)}
                                     </span>

@@ -40,8 +40,25 @@ async function getPublicSettings(): Promise<SiteSettings | null> {
     return response.json()
 }
 
+async function getApiSettings(): Promise<SiteSettings | null> {
+    const response = await apiClient.get('/settings')
+    return response.data ?? DEFAULT_SETTINGS
+}
+
+interface GetSettingsOptions {
+    preferFresh?: boolean
+}
+
 export const settingsService = {
-    async getSettings(): Promise<SiteSettings> {
+    async getSettings({ preferFresh = false }: GetSettingsOptions = {}): Promise<SiteSettings> {
+        if (preferFresh) {
+            try {
+                return (await getApiSettings()) ?? DEFAULT_SETTINGS
+            } catch {
+                // Fall through to public artifact for resilience.
+            }
+        }
+
         try {
             return (await getPublicSettings()) ?? DEFAULT_SETTINGS
         } catch {
@@ -49,8 +66,7 @@ export const settingsService = {
         }
 
         try {
-            const response = await apiClient.get('/settings')
-            return response.data ?? DEFAULT_SETTINGS
+            return (await getApiSettings()) ?? DEFAULT_SETTINGS
         } catch {
             return DEFAULT_SETTINGS
         }
