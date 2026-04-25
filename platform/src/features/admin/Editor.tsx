@@ -299,7 +299,7 @@ export default function Editor() {
 
         try {
             const contentHtml = contentRef.current?.innerHTML || ''
-            const [result] = await Promise.all([
+            await Promise.all([
                 id
                     ? postService.updatePost(id, {
                           title,
@@ -321,8 +321,8 @@ export default function Editor() {
             setLastSaved(new Date())
             await useAdminStore.getState().fetchPosts(true)
 
-            if (shouldPublish && result) {
-                navigate(`/blog/${result.slug}`)
+            if (shouldPublish) {
+                navigate('/admin')
             }
         } catch (error: any) {
             const msg = error?.message || 'Failed to save post'

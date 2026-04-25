@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react'
-import { extent, max, ticks } from 'd3-array'
-import { scaleBand, scaleLinear } from 'd3-scale'
-import { area, curveBasis, line } from 'd3-shape'
+import { max } from 'd3-array'
+import { scaleLinear } from 'd3-scale'
+import { area, curveMonotoneX, line } from 'd3-shape'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAdminStore } from '@/stores/adminStore'
@@ -78,13 +78,13 @@ export default function Dashboard() {
 
                 <Card className="overflow-hidden border-border bg-transparent shadow-none">
                     <CardContent className="px-0 py-4 sm:py-6">
-                        <div className="h-[300px] w-full min-w-0 overflow-hidden">
+                        <div className="h-[340px] w-full min-w-0 overflow-hidden">
                             {!ready || graphData.length === 0 ? (
                                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                                     {!ready ? null : 'No stats recorded yet'}
                                 </div>
                             ) : (
-                                <RidgelineAnalyticsChart data={graphData} />
+                                <CombinedAnalyticsChart data={graphData} />
                             )}
                         </div>
                     </CardContent>
@@ -147,183 +147,201 @@ type ChartPoint = {
     shares?: number
 }
 
-function RidgelineAnalyticsChart({ data }: { data: ChartPoint[] }) {
-    const width = 780
-    const height = 320
-    const padding = { top: 32, right: 24, bottom: 48, left: 92 }
+function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
+    const width = 980
+    const height = 340
+    const padding = { top: 34, right: 84, bottom: 48, left: 58 }
+    const innerWidth = width - padding.left - padding.right
     const innerHeight = height - padding.top - padding.bottom
-    const values = data.flatMap((point) => [point.views || 0, point.shares || 0]).filter((value) => Number.isFinite(value))
-    const [rawMin = 0, rawMax = 1] = extent(values)
-    const domainMin = Math.min(0, rawMin)
-    const domainMax = rawMax <= domainMin ? domainMin + 1 : rawMax
-    const xScale = scaleLinear().domain([domainMin, domainMax]).range([padding.left, width - padding.right]).nice()
-    const groups = [
-        {
-            key: 'views',
-            label: 'Views',
-            color: '#00cbff',
-            values: data.map((point) => point.views || 0),
-        },
-        {
-            key: 'shares',
-            label: 'Shares',
-            color: '#f59e0b',
-            values: data.map((point) => point.shares || 0),
-        },
-    ]
-    const yScale = scaleBand<string>()
-        .domain(groups.map((group) => group.label))
-        .range([padding.top, padding.top + innerHeight])
-        .paddingInner(0.34)
-        .paddingOuter(0.16)
-    const thresholds = ticks(xScale.domain()[0], xScale.domain()[1], 48)
-    const bandwidth = yScale.bandwidth()
-    const densityHeight = Math.max(36, bandwidth * 0.82)
-    const bandwidthEstimate = Math.max((xScale.domain()[1] - xScale.domain()[0]) / 18, 1)
-    const densities = groups.map((group) => ({
-        ...group,
-        density: kernelDensityEstimator(kernelEpanechnikov(bandwidthEstimate), thresholds)(group.values),
+    const points = data.map((point, index) => ({
+        index,
+        date: point.date,
+        label: point.name || point.date,
+        views: Math.max(0, point.views || 0),
+        shares: Math.max(0, point.shares || 0),
     }))
-    const maxDensity = max(densities.flatMap((group) => group.density.map((point) => point[1]))) || 1
-    const ridgeScale = scaleLinear().domain([0, maxDensity]).range([0, densityHeight])
-    const areaGenerator = area<[number, number]>()
-        .curve(curveBasis)
-        .x((point) => xScale(point[0]))
-        .y0(() => 0)
-        .y1((point) => -ridgeScale(point[1]))
-    const lineGenerator = line<[number, number]>()
-        .curve(curveBasis)
-        .x((point) => xScale(point[0]))
-        .y((point) => -ridgeScale(point[1]))
-    const xTicks = xScale.ticks(5)
-    const baselineFor = (label: string) => (yScale(label) || padding.top) + bandwidth
+    const xScale = scaleLinear()
+        .domain([0, Math.max(1, points.length - 1)])
+        .range([padding.left, padding.left + innerWidth])
+    const yScale = scaleLinear()
+        .domain([0, Math.max(1, max(points.flatMap((point) => [point.views, point.shares])) || 0)])
+        .range([padding.top + innerHeight, padding.top])
+        .nice(4)
+    const yTicks = yScale.ticks(4)
+    const labelStep = Math.max(1, Math.ceil(points.length / 5))
+    const baseline = yScale(0)
+    const viewsPath = line<(typeof points)[number]>()
+        .curve(curveMonotoneX)
+        .x((point) => xScale(point.index))
+        .y((point) => yScale(point.views))(points)
+    const sharesPath = line<(typeof points)[number]>()
+        .curve(curveMonotoneX)
+        .x((point) => xScale(point.index))
+        .y((point) => yScale(point.shares))(points)
+    const viewsArea = area<(typeof points)[number]>()
+        .curve(curveMonotoneX)
+        .x((point) => xScale(point.index))
+        .y0(baseline)
+        .y1((point) => yScale(point.views))(points)
+    const lastPoint = points[points.length - 1]
+    const previousPoint = points[points.length - 2]
+    const viewsDelta = lastPoint && previousPoint ? lastPoint.views - previousPoint.views : 0
+    const sharesDelta = lastPoint && previousPoint ? lastPoint.shares - previousPoint.shares : 0
+    const viewsLabelY = lastPoint ? yScale(lastPoint.views) : 0
+    const rawSharesLabelY = lastPoint ? yScale(lastPoint.shares) : 0
+    const sharesLabelY =
+        lastPoint && Math.abs(viewsLabelY - rawSharesLabelY) < 26
+            ? Math.min(height - 34, rawSharesLabelY + 26)
+            : rawSharesLabelY
 
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
             className="block h-full w-full overflow-visible"
             role="img"
-            aria-label="Ridgeline distribution chart for views and shares"
+            aria-label="Combined analytics chart for views and shares over time"
         >
             <defs>
-                <linearGradient id="dash_ridge_views" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00cbff" stopOpacity="0.85" />
-                    <stop offset="100%" stopColor="#00cbff" stopOpacity="0.08" />
+                <linearGradient id="dash_views_area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--foreground))" stopOpacity="0.2" />
+                    <stop offset="55%" stopColor="hsl(var(--foreground))" stopOpacity="0.075" />
+                    <stop offset="100%" stopColor="hsl(var(--foreground))" stopOpacity="0" />
                 </linearGradient>
-                <linearGradient id="dash_ridge_shares" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.85" />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.08" />
+                <linearGradient id="dash_views_line" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="hsl(var(--muted-foreground))" />
+                    <stop offset="100%" stopColor="hsl(var(--foreground))" />
                 </linearGradient>
             </defs>
 
-            <text x={padding.left} y={18} fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="600">
-                Distribution
-            </text>
-            <g transform={`translate(${width - padding.right - 144} 8)`}>
-                <rect width="10" height="10" rx="3" fill="#00cbff" opacity="0.75" />
-                <text x="16" y="10" fill="hsl(var(--muted-foreground))" fontSize="12">Views</text>
-                <rect x="70" width="10" height="10" rx="3" fill="#f59e0b" opacity="0.75" />
-                <text x="90" y="10" fill="hsl(var(--muted-foreground))" fontSize="12">Shares</text>
+            <g transform={`translate(${padding.left} 12)`}>
+                <text fill="hsl(var(--foreground))" fontSize="13" fontWeight="700" letterSpacing="0.02em">
+                    Views and shares
+                </text>
+                <text x="0" y="20" fill="hsl(var(--muted-foreground))" fontSize="11">
+                    Daily performance
+                </text>
+            </g>
+            <g transform={`translate(${width - padding.right - 196} 15)`}>
+                <circle cx="5" cy="5" r="4" fill="hsl(var(--foreground))" />
+                <text x="16" y="9" fill="hsl(var(--muted-foreground))" fontSize="12">Views</text>
+                <line x1="76" x2="92" y1="5" y2="5" stroke="#d6a04f" strokeWidth="2.4" strokeLinecap="round" />
+                <text x="102" y="9" fill="hsl(var(--muted-foreground))" fontSize="12">Shares</text>
             </g>
 
-            {xTicks.map((tick) => (
+            {yTicks.map((tick) => (
                 <g key={tick}>
                     <line
-                        x1={xScale(tick)}
-                        x2={xScale(tick)}
-                        y1={padding.top + 12}
-                        y2={padding.top + innerHeight}
+                        x1={padding.left}
+                        x2={width - padding.right}
+                        y1={yScale(tick)}
+                        y2={yScale(tick)}
                         stroke="hsl(var(--border))"
-                        strokeDasharray="4 8"
-                        strokeOpacity="0.55"
+                        strokeDasharray={tick === 0 ? undefined : '3 8'}
+                        strokeOpacity={tick === 0 ? 0.9 : 0.5}
                     />
                     <text
-                        x={xScale(tick)}
-                        y={height - 18}
-                        textAnchor="middle"
+                        x={padding.left - 14}
+                        y={yScale(tick) + 4}
+                        textAnchor="end"
                         fill="hsl(var(--muted-foreground))"
-                        fontSize="12"
+                        fontSize="11"
                     >
                         {formatAxisValue(tick)}
                     </text>
                 </g>
             ))}
 
-            {densities.map((group) => {
-                const baseline = baselineFor(group.label)
-                const fillId = group.key === 'views' ? 'dash_ridge_views' : 'dash_ridge_shares'
+            {viewsArea ? <path d={viewsArea} fill="url(#dash_views_area)" /> : null}
+            {viewsPath ? (
+                <path
+                    d={viewsPath}
+                    fill="none"
+                    stroke="url(#dash_views_line)"
+                    strokeWidth="3.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            ) : null}
+            {sharesPath ? (
+                <path
+                    d={sharesPath}
+                    fill="none"
+                    stroke="#d6a04f"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            ) : null}
+
+            {points.map((point, index) => {
+                const showLabel = index === 0 || index === points.length - 1 || index % labelStep === 0
                 return (
-                    <g key={group.key} transform={`translate(0 ${baseline})`}>
-                        <line
-                            x1={padding.left}
-                            x2={width - padding.right}
-                            y1="0"
-                            y2="0"
-                            stroke="hsl(var(--border))"
-                            strokeOpacity="0.8"
+                    <g key={`${point.date}-${index}`}>
+                        <circle cx={xScale(point.index)} cy={yScale(point.views)} r="3.8" fill="hsl(var(--foreground))">
+                            <title>{`${point.label}: ${point.views} views, ${point.shares} shares`}</title>
+                        </circle>
+                        <circle
+                            cx={xScale(point.index)}
+                            cy={yScale(point.shares)}
+                            r="3"
+                            fill="#d6a04f"
+                            stroke="hsl(var(--background))"
+                            strokeWidth="1.8"
                         />
-                        <path
-                            d={areaGenerator(group.density) || undefined}
-                            fill={`url(#${fillId})`}
-                            stroke="none"
-                        />
-                        <path
-                            d={lineGenerator(group.density) || undefined}
-                            fill="none"
-                            stroke={group.color}
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                        />
-                        <text
-                            x={padding.left - 16}
-                            y="-4"
-                            textAnchor="end"
-                            fill="hsl(var(--foreground))"
-                            fontSize="13"
-                            fontWeight="600"
-                        >
-                            {group.label}
-                        </text>
-                        <title>{`${group.label}: ${group.values.join(', ')}`}</title>
+                        {showLabel ? (
+                            <text
+                                x={xScale(point.index)}
+                                y={height - 18}
+                                textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
+                                fill="hsl(var(--muted-foreground))"
+                                fontSize="11"
+                            >
+                                {point.label}
+                            </text>
+                        ) : null}
                     </g>
                 )
             })}
 
-            <line
-                x1={padding.left}
-                x2={width - padding.right}
-                y1={padding.top + innerHeight}
-                y2={padding.top + innerHeight}
-                stroke="hsl(var(--border))"
-            />
-            <text
-                x={width - padding.right}
-                y={height - 4}
-                textAnchor="end"
-                fill="hsl(var(--muted-foreground))"
-                fontSize="11"
-            >
-                event count
-            </text>
+            {lastPoint ? (
+                <>
+                    <g transform={`translate(${width - padding.right + 12} ${viewsLabelY})`}>
+                        <text fill="hsl(var(--foreground))" fontSize="12" fontWeight="700">
+                            {formatAxisValue(lastPoint.views)}
+                        </text>
+                        <text
+                            y="16"
+                            fill="hsl(var(--muted-foreground))"
+                            fontSize="10"
+                            letterSpacing="0.04em"
+                        >
+                            views {formatDelta(viewsDelta)}
+                        </text>
+                    </g>
+                    <g transform={`translate(${width - padding.right + 12} ${sharesLabelY})`}>
+                        <text fill="#d6a04f" fontSize="12" fontWeight="700">
+                            {formatAxisValue(lastPoint.shares)}
+                        </text>
+                        <text
+                            y="16"
+                            fill="hsl(var(--muted-foreground))"
+                            fontSize="10"
+                            letterSpacing="0.04em"
+                        >
+                            shares {formatDelta(sharesDelta)}
+                        </text>
+                    </g>
+                </>
+            ) : null}
         </svg>
     )
 }
 
-function kernelDensityEstimator(kernel: (value: number) => number, thresholds: number[]) {
-    return (values: number[]) =>
-        thresholds.map((threshold) => [
-            threshold,
-            values.reduce((sum, value) => sum + kernel(threshold - value), 0) / Math.max(1, values.length),
-        ] as [number, number])
-}
-
-function kernelEpanechnikov(bandwidth: number) {
-    return (value: number) => {
-        const scaled = value / bandwidth
-        return Math.abs(scaled) <= 1 ? (0.75 * (1 - scaled * scaled)) / bandwidth : 0
-    }
-}
-
 function formatAxisValue(value: number) {
     return Math.round(value).toLocaleString()
+}
+
+function formatDelta(value: number) {
+    if (value === 0) return '0'
+    return `${value > 0 ? '+' : ''}${formatAxisValue(value)}`
 }
