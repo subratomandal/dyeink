@@ -6,6 +6,7 @@ import { useAdminStore } from '@/stores/adminStore'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import DecryptedText from '@/components/common/animations/DecryptedText'
+import Vaso from '@/components/common/effects/Vaso'
 import AdminGreeting from './AdminGreeting'
 import NewPostButton from './sidebar/NewPostButton'
 import { cn } from '@/lib/utils'
@@ -144,7 +145,15 @@ export default function AdminLayout() {
 
     return (
         <div className="flex min-h-screen bg-background">
-            <aside className="liquidGL admin-liquidGL fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]">
+            <Vaso
+                component="aside"
+                px={0}
+                py={0}
+                depth={1.15}
+                blur={0.55}
+                dispersion={0.28}
+                className="admin-vaso fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]"
+            >
                 <div className="px-5 pb-4 pt-8">
                     <AdminGreeting name={greetingName} />
                 </div>
@@ -191,7 +200,7 @@ export default function AdminLayout() {
                         <span>Sign Out</span>
                     </button>
                 </div>
-            </aside>
+            </Vaso>
 
             <main className="admin-main relative ml-[260px] h-screen flex-1 overflow-hidden bg-background">
                 <div className="absolute right-6 top-6 z-50">
@@ -206,70 +215,71 @@ export default function AdminLayout() {
             </main>
 
             <style>{`
-                .admin-liquidGL {
-                    --liquid-refraction: 0.02;
-                    --liquid-bevel-depth: 0.12;
-                    --liquid-bevel-width: 8%;
-                    --liquid-frost: 1.5px;
+                .admin-vaso {
                     isolation: isolate;
                     overflow: hidden;
                     background:
-                        radial-gradient(circle at 12% 0%, color-mix(in srgb, hsl(var(--foreground)) 10%, transparent), transparent 34%),
-                        linear-gradient(180deg, color-mix(in srgb, hsl(var(--card)) 82%, transparent), color-mix(in srgb, hsl(var(--background)) 72%, transparent)) !important;
-                    backdrop-filter: blur(calc(var(--liquid-frost) * 8)) saturate(1.35);
-                    -webkit-backdrop-filter: blur(calc(var(--liquid-frost) * 8)) saturate(1.35);
+                        radial-gradient(circle at 14% 0%, color-mix(in srgb, hsl(var(--foreground)) 8%, transparent), transparent 34%),
+                        color-mix(in srgb, hsl(var(--card)) 62%, transparent) !important;
                     box-shadow:
-                        12px 0 38px rgba(0, 0, 0, 0.14),
-                        inset -1px 0 0 color-mix(in srgb, hsl(var(--foreground)) 18%, transparent),
-                        inset 1px 0 0 color-mix(in srgb, hsl(var(--background)) 65%, transparent) !important;
+                        10px 0 34px rgba(0, 0, 0, 0.13),
+                        inset -1px 0 0 color-mix(in srgb, hsl(var(--foreground)) 14%, transparent),
+                        inset 1px 0 0 color-mix(in srgb, hsl(var(--background)) 62%, transparent) !important;
                 }
-                .admin-liquidGL::before,
-                .admin-liquidGL::after {
+                .admin-vaso [data-vaso] {
+                    border-radius: inherit;
+                    background:
+                        linear-gradient(90deg,
+                            color-mix(in srgb, hsl(var(--foreground)) 7%, transparent),
+                            color-mix(in srgb, hsl(var(--card)) 26%, transparent) 26%,
+                            color-mix(in srgb, hsl(var(--background)) 18%, transparent));
+                    border-right: 1px solid color-mix(in srgb, hsl(var(--foreground)) 16%, transparent);
+                }
+                .admin-vaso [data-vaso]::before,
+                .admin-vaso [data-vaso]::after {
                     content: "";
                     position: absolute;
                     inset: 0;
                     pointer-events: none;
                 }
-                .admin-liquidGL::before {
-                    z-index: 0;
+                .admin-vaso [data-vaso]::before {
                     background:
                         linear-gradient(90deg,
-                            color-mix(in srgb, hsl(var(--foreground)) 18%, transparent) 0,
-                            transparent var(--liquid-bevel-width),
-                            transparent calc(100% - var(--liquid-bevel-width)),
+                            color-mix(in srgb, hsl(var(--foreground)) 14%, transparent) 0,
+                            transparent 8%,
+                            transparent 92%,
                             color-mix(in srgb, hsl(var(--foreground)) 12%, transparent) 100%),
-                        radial-gradient(80% 18% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 12%, transparent), transparent 72%);
-                    opacity: var(--liquid-bevel-depth);
+                        radial-gradient(90% 20% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 10%, transparent), transparent 72%);
+                    opacity: 0.9;
                 }
-                .admin-liquidGL::after {
-                    z-index: 1;
+                .admin-vaso [data-vaso]::after {
                     background:
-                        linear-gradient(115deg, transparent 0%, transparent 38%, color-mix(in srgb, hsl(var(--foreground)) 16%, transparent) 48%, transparent 58%, transparent 100%);
+                        linear-gradient(116deg, transparent 0%, transparent 38%, color-mix(in srgb, hsl(var(--foreground)) 14%, transparent) 49%, transparent 60%, transparent 100%);
                     mix-blend-mode: screen;
-                    opacity: 0.42;
-                    animation: admin-liquid-specular 7s ease-in-out infinite alternate;
+                    opacity: 0.34;
+                    animation: admin-vaso-specular 8s ease-in-out infinite alternate;
                 }
-                .admin-liquidGL > * {
+                .admin-vaso > :not([data-vaso], svg, canvas) {
                     position: relative;
                     z-index: 2;
                 }
-                @keyframes admin-liquid-specular {
+                @keyframes admin-vaso-specular {
                     from {
-                        transform: translate3d(-24%, -10%, 0);
-                        opacity: 0.22;
+                        transform: translate3d(-20%, -10%, 0);
+                        opacity: 0.18;
                     }
                     to {
-                        transform: translate3d(24%, 10%, 0);
-                        opacity: 0.5;
+                        transform: translate3d(20%, 10%, 0);
+                        opacity: 0.42;
                     }
                 }
                 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-                    .admin-liquidGL {
+                    .admin-vaso {
                         background: hsl(var(--card)) !important;
                     }
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    .admin-liquidGL::after {
+                    .admin-vaso [data-vaso]::after {
                         animation: none !important;
                     }
                 }
@@ -290,24 +300,26 @@ export default function AdminLayout() {
                         overflow-y: hidden !important;
                         padding: 0 max(0.45rem, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0.45rem, env(safe-area-inset-left)) !important;
                     }
-                    .admin-liquidGL {
+                    .admin-vaso {
                         background:
-                            radial-gradient(100% 120% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 11%, transparent), transparent 46%),
-                            linear-gradient(180deg, color-mix(in srgb, hsl(var(--card)) 84%, transparent), color-mix(in srgb, hsl(var(--background)) 72%, transparent)) !important;
-                        backdrop-filter: blur(calc(var(--liquid-frost) * 7)) saturate(1.32);
-                        -webkit-backdrop-filter: blur(calc(var(--liquid-frost) * 7)) saturate(1.32);
+                            radial-gradient(100% 120% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 8%, transparent), transparent 48%),
+                            color-mix(in srgb, hsl(var(--card)) 60%, transparent) !important;
                         box-shadow:
-                            0 -12px 34px rgba(0, 0, 0, 0.16),
-                            inset 0 1px 0 color-mix(in srgb, hsl(var(--foreground)) 18%, transparent),
-                            inset 0 -1px 0 color-mix(in srgb, hsl(var(--background)) 62%, transparent) !important;
+                            0 -10px 30px rgba(0, 0, 0, 0.14),
+                            inset 0 1px 0 color-mix(in srgb, hsl(var(--foreground)) 14%, transparent),
+                            inset 0 -1px 0 color-mix(in srgb, hsl(var(--background)) 60%, transparent) !important;
                     }
-                    .admin-liquidGL::before {
+                    .admin-vaso [data-vaso] {
+                        border-right: 0;
+                        border-top: 1px solid color-mix(in srgb, hsl(var(--foreground)) 15%, transparent);
+                    }
+                    .admin-vaso [data-vaso]::before {
                         background:
                             linear-gradient(180deg,
-                                color-mix(in srgb, hsl(var(--foreground)) 18%, transparent) 0,
-                                transparent var(--liquid-bevel-width),
-                                transparent calc(100% - var(--liquid-bevel-width)),
-                                color-mix(in srgb, hsl(var(--foreground)) 10%, transparent) 100%);
+                                color-mix(in srgb, hsl(var(--foreground)) 14%, transparent) 0,
+                                transparent 8%,
+                                transparent 92%,
+                                color-mix(in srgb, hsl(var(--foreground)) 8%, transparent) 100%);
                     }
                     aside > div:first-child,
                     aside [data-section-label] { display: none !important; }
