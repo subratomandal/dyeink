@@ -25,9 +25,11 @@ type Bindings = {
   DB: D1Database
   IMAGES: R2Bucket
   ASSETS: Fetcher
+  ANALYTICS?: AnalyticsEngineDataset
   APP_PASSWORD?: string // optional: seeds the admin row on first deploy if present
   FRONTEND_ORIGIN?: string
   R2_PUBLIC_URL?: string
+  D1_HIT_ROLLUPS?: string
 }
 
 type Variables = {
@@ -56,6 +58,64 @@ app.use('/api/*', (c, next) => {
 // ---------- Auth middleware ----------
 
 type AppCtx = Context<{ Bindings: Bindings; Variables: Variables }>
+
+const PUBLIC_JSON_CACHE = 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+const PUBLIC_ARTIFACT_PREFIX = 'public'
+
+function hashString(input: string): string {
+  let hash = 2166136261
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+function publicPostArtifactKey(slug: string): string {
+  return `${PUBLIC_ARTIFACT_PREFIX}/posts/${encodeURIComponent(slug)}.json`
+}
+
+function cachedJson(c: AppCtx, body: unknown, cacheControl = PUBLIC_JSON_CACHE) {
+  const payload = JSON.stringify(body)
+  const etag = `W/"${hashString(payload)}"`
+  const headers = new Headers({
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': cacheControl,
+    etag,
+  })
+
+  if (c.req.header('if-none-match') === etag) {
+    return new Response(null, { status: 304, headers })
+  }
+
+  return new Response(payload, { headers })
+}
+
+async function cachedArtifactJson(
+  c: AppCtx,
+  key: string,
+  fallback: () => Promise<unknown>,
+  cacheControl = PUBLIC_JSON_CACHE,
+) {
+  const object = await c.env.IMAGES.get(key)
+  if (object) {
+    const headers = new Headers()
+    object.writeHttpMetadata(headers)
+    headers.set('content-type', 'application/json; charset=utf-8')
+    headers.set('cache-control', cacheControl)
+    headers.set('etag', object.httpEtag)
+
+    if (c.req.header('if-none-match') === object.httpEtag) {
+      return new Response(null, { status: 304, headers })
+    }
+
+    return new Response(object.body, { headers })
+  }
+
+  const body = await fallback()
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
+  return cachedJson(c, body, cacheControl)
+}
 
 async function getSessionSecret(c: AppCtx): Promise<string | null> {
   const row = await c.env.DB.prepare('SELECT session_secret FROM admin WHERE id = 1')
@@ -253,6 +313,7 @@ app.post('/api/setup', async (c) => {
 
   const { cookie } = await createSessionToken(secret)
   c.header('Set-Cookie', cookie)
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json({ ok: true })
 })
 
@@ -348,6 +409,8 @@ interface PostRow {
   updated_at: number
 }
 
+type PublicPostRow = Omit<PostRow, 'content'>
+
 function serializePost(p: PostRow) {
   return {
     id: p.id,
@@ -363,6 +426,41 @@ function serializePost(p: PostRow) {
     createdAt: new Date(p.created_at * 1000).toISOString(),
     updatedAt: new Date(p.updated_at * 1000).toISOString(),
   }
+}
+
+function serializePublicPost(p: PublicPostRow) {
+  return {
+    id: p.id,
+    title: p.title,
+    slug: p.slug,
+    excerpt: p.excerpt,
+    coverImage: p.cover_image || '',
+    published: !!p.published,
+    publishedAt: p.published_at ? new Date(p.published_at * 1000).toISOString() : null,
+    views: p.views,
+    shares: p.shares,
+    createdAt: new Date(p.created_at * 1000).toISOString(),
+    updatedAt: new Date(p.updated_at * 1000).toISOString(),
+  }
+}
+
+async function getPublicPostsPayload(db: D1Database) {
+  const { results } = await db
+    .prepare(
+      `SELECT id, title, slug, excerpt, cover_image, published, published_at,
+       views, shares, created_at, updated_at
+       FROM posts WHERE published = 1 ORDER BY published_at DESC`,
+    )
+    .all<PublicPostRow>()
+  return { posts: results.map(serializePublicPost), total: results.length }
+}
+
+async function getPublicPostPayload(db: D1Database, slug: string) {
+  const row = await db
+    .prepare('SELECT * FROM posts WHERE slug = ? AND published = 1')
+    .bind(slug)
+    .first<PostRow>()
+  return row ? serializePost(row) : null
 }
 
 app.get('/api/posts', requireAuth, async (c) => {
@@ -418,14 +516,12 @@ app.post('/api/posts', requireAuth, async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM posts WHERE id = ?')
     .bind(id)
     .first<PostRow>()
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json(serializePost(row!), 201)
 })
 
 app.get('/api/posts/public', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM posts WHERE published = 1 ORDER BY published_at DESC',
-  ).all<PostRow>()
-  return c.json({ posts: results.map(serializePost) })
+  return cachedJson(c, await getPublicPostsPayload(c.env.DB))
 })
 
 app.get('/api/posts/slug/:slug', async (c) => {
@@ -440,7 +536,8 @@ app.get('/api/posts/slug/:slug', async (c) => {
     const session = await authPeek(c)
     if (!session) return c.json({ error: 'Not found' }, 404)
   }
-  return c.json(serializePost(row))
+  const body = serializePost(row)
+  return row.published ? cachedJson(c, body) : c.json(body)
 })
 
 app.get('/api/posts/:id', async (c) => {
@@ -500,6 +597,7 @@ app.put('/api/posts/:id', requireAuth, async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM posts WHERE id = ?')
     .bind(id)
     .first<PostRow>()
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json(serializePost(row!))
 })
 
@@ -507,11 +605,13 @@ app.delete('/api/posts/:id', requireAuth, async (c) => {
   const id = c.req.param('id')
   const res = await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run()
   if (res.meta.changes === 0) return c.json({ error: 'Post not found' }, 404)
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json({ ok: true })
 })
 
 app.delete('/api/posts', requireAuth, async (c) => {
   await c.env.DB.prepare('DELETE FROM posts').run()
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json({ ok: true })
 })
 
@@ -555,10 +655,106 @@ function serializeSettings(r: SettingsRow | null) {
   }
 }
 
+async function getSettingsPayload(db: D1Database) {
+  const row = await db.prepare('SELECT * FROM site_settings WHERE id = 1').first<SettingsRow>()
+  return serializeSettings(row)
+}
+
+async function putJsonArtifact(bucket: R2Bucket, key: string, value: unknown) {
+  await bucket.put(key, JSON.stringify(value), {
+    httpMetadata: {
+      contentType: 'application/json; charset=utf-8',
+      cacheControl: PUBLIC_JSON_CACHE,
+    },
+  })
+}
+
+async function deleteStalePostArtifacts(bucket: R2Bucket, activeKeys: Set<string>) {
+  let cursor: string | undefined
+  do {
+    const listed = await bucket.list({
+      prefix: `${PUBLIC_ARTIFACT_PREFIX}/posts/`,
+      cursor,
+    })
+    await Promise.all(
+      listed.objects
+        .filter((object) => object.key.endsWith('.json') && !activeKeys.has(object.key))
+        .map((object) => bucket.delete(object.key)),
+    )
+    cursor = listed.truncated ? listed.cursor : undefined
+  } while (cursor)
+}
+
+async function refreshPublicArtifacts(env: Bindings) {
+  const [settings, publicPosts] = await Promise.all([
+    getSettingsPayload(env.DB),
+    getPublicPostsPayload(env.DB),
+  ])
+  const { results: fullPosts } = await env.DB.prepare(
+    'SELECT * FROM posts WHERE published = 1 ORDER BY published_at DESC',
+  ).all<PostRow>()
+
+  const activePostKeys = new Set(fullPosts.map((post) => publicPostArtifactKey(post.slug)))
+  await Promise.all([
+    putJsonArtifact(env.IMAGES, `${PUBLIC_ARTIFACT_PREFIX}/settings.json`, settings),
+    putJsonArtifact(env.IMAGES, `${PUBLIC_ARTIFACT_PREFIX}/posts.json`, publicPosts),
+    ...fullPosts.map((post) =>
+      putJsonArtifact(env.IMAGES, publicPostArtifactKey(post.slug), serializePost(post)),
+    ),
+  ])
+  await deleteStalePostArtifacts(env.IMAGES, activePostKeys)
+}
+
+app.get('/public/settings.json', async (c) => {
+  await ensureBootstrap(c)
+  return cachedArtifactJson(
+    c,
+    `${PUBLIC_ARTIFACT_PREFIX}/settings.json`,
+    () => getSettingsPayload(c.env.DB),
+  )
+})
+
+app.get('/public/posts.json', async (c) => {
+  await ensureBootstrap(c)
+  return cachedArtifactJson(
+    c,
+    `${PUBLIC_ARTIFACT_PREFIX}/posts.json`,
+    () => getPublicPostsPayload(c.env.DB),
+  )
+})
+
+app.get('/public/posts/:file', async (c) => {
+  const file = c.req.param('file')
+  if (!file.endsWith('.json')) return c.notFound()
+
+  await ensureBootstrap(c)
+  const slug = decodeURIComponent(file.slice(0, -'.json'.length))
+  const fallback = async () => {
+    const post = await getPublicPostPayload(c.env.DB, slug)
+    if (!post) return null
+    return post
+  }
+  const post = await c.env.IMAGES.get(publicPostArtifactKey(slug))
+  if (!post) {
+    const payload = await fallback()
+    if (!payload) return c.json({ error: 'Post not found' }, 404)
+    c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
+    return cachedJson(c, payload)
+  }
+
+  const headers = new Headers()
+  post.writeHttpMetadata(headers)
+  headers.set('content-type', 'application/json; charset=utf-8')
+  headers.set('cache-control', PUBLIC_JSON_CACHE)
+  headers.set('etag', post.httpEtag)
+  if (c.req.header('if-none-match') === post.httpEtag) {
+    return new Response(null, { status: 304, headers })
+  }
+  return new Response(post.body, { headers })
+})
+
 app.get('/api/settings', async (c) => {
-  const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
-    .first<SettingsRow>()
-  return c.json(serializeSettings(row))
+  return cachedJson(c, await getSettingsPayload(c.env.DB))
 })
 
 app.put('/api/settings', requireAuth, async (c) => {
@@ -623,12 +819,32 @@ app.put('/api/settings', requireAuth, async (c) => {
 
   const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
     .first<SettingsRow>()
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json(serializeSettings(row))
 })
 
 // ==========================================================================
 // STATS
 // ==========================================================================
+
+async function recordD1Hit(env: Bindings, id: string, type: 'view' | 'share') {
+  const field = type === 'view' ? 'views' : 'shares'
+  const updated = await env.DB.prepare(
+    `UPDATE posts SET ${field} = ${field} + 1 WHERE id = ? AND published = 1`,
+  )
+    .bind(id)
+    .run()
+
+  if ((updated.meta.changes ?? 0) === 0) return
+
+  const dayUtc = Math.floor(Date.now() / 1000 / 86400) * 86400
+  await env.DB.prepare(
+    `INSERT INTO daily_stats (post_id, day_utc, ${field}) VALUES (?, ?, 1)
+     ON CONFLICT(post_id, day_utc) DO UPDATE SET ${field} = ${field} + 1`,
+  )
+    .bind(id, dayUtc)
+    .run()
+}
 
 app.get('/api/hit', async (c) => {
   const id = c.req.query('id')
@@ -637,19 +853,15 @@ app.get('/api/hit', async (c) => {
     return c.json({ error: 'Invalid parameters' }, 400)
   }
 
-  const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ?').bind(id).first()
-  if (!post) return c.json({ error: 'Post not found' }, 404)
+  c.env.ANALYTICS?.writeDataPoint({
+    indexes: [id],
+    blobs: [type, c.req.header('cf-ipcountry') ?? 'unknown'],
+    doubles: [Date.now()],
+  })
 
-  const field = type === 'view' ? 'views' : 'shares'
-  const dayUtc = Math.floor(Date.now() / 1000 / 86400) * 86400
-
-  await c.env.DB.batch([
-    c.env.DB.prepare(`UPDATE posts SET ${field} = ${field} + 1 WHERE id = ?`).bind(id),
-    c.env.DB.prepare(
-      `INSERT INTO daily_stats (post_id, day_utc, ${field}) VALUES (?, ?, 1)
-       ON CONFLICT(post_id, day_utc) DO UPDATE SET ${field} = ${field} + 1`,
-    ).bind(id, dayUtc),
-  ])
+  if (c.env.D1_HIT_ROLLUPS !== 'off') {
+    c.executionCtx.waitUntil(recordD1Hit(c.env, id, type).catch((err) => console.error(err)))
+  }
 
   return c.json({ ok: true })
 })

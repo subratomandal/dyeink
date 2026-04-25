@@ -13,6 +13,10 @@ export interface Post {
     updatedAt: string
 }
 
+export type PublicPost = Omit<Post, 'content'> & {
+    content?: string
+}
+
 export interface CreatePostInput {
     title: string
     content: string

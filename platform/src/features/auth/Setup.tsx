@@ -22,17 +22,23 @@ const RULES: { test: (s: string) => boolean; label: string }[] = [
 export default function Setup() {
     const navigate = useNavigate()
     const { addToast } = useToast()
-    const { needsSetup, isAuthenticated, isLoading, setup } = useAuthStore()
+    const { needsSetup, isAuthenticated, isLoading, hasChecked, initialize, setup } = useAuthStore()
     const [password, setPassword] = useState('')
     const [confirm, setConfirm] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
+        if (!hasChecked && !isLoading) {
+            initialize()
+        }
+    }, [hasChecked, initialize, isLoading])
+
+    useEffect(() => {
         if (isAuthenticated && !isLoading) navigate('/admin')
     }, [isAuthenticated, isLoading, navigate])
 
-    if (!isLoading && !needsSetup && !isAuthenticated) return <Navigate to="/login" replace />
-    if (isLoading) {
+    if (hasChecked && !isLoading && !needsSetup && !isAuthenticated) return <Navigate to="/login" replace />
+    if (!hasChecked || isLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

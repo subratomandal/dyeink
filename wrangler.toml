@@ -28,6 +28,17 @@ migrations_dir = "backend/migrations"
 binding = "IMAGES"
 bucket_name = "dyeink-images"
 
+# -------- Analytics Engine: high-volume event stream --------
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "dyeink_events"
+
+[vars]
+# Keep D1 aggregate counters on by default so the existing admin Stats
+# dashboard stays populated. Set to "off" after moving stats reads fully to
+# Analytics Engine if you want zero D1 writes from public view/share events.
+D1_HIT_ROLLUPS = "on"
+
 [observability]
 enabled = true
 head_sampling_rate = 1

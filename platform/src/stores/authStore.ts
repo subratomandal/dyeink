@@ -4,6 +4,7 @@ import apiClient from '@/lib/apiClient'
 interface AuthState {
     isAuthenticated: boolean
     isLoading: boolean
+    hasChecked: boolean
     needsSetup: boolean
     name: string
     email: string
@@ -15,7 +16,8 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
     isAuthenticated: false,
-    isLoading: true,
+    isLoading: false,
+    hasChecked: false,
     needsSetup: false,
     name: '',
     email: '',
@@ -25,7 +27,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         try {
             const status = await apiClient.get('/setup/status')
             if (!status.data.initialized) {
-                set({ isLoading: false, needsSetup: true, isAuthenticated: false })
+                set({ isLoading: false, hasChecked: true, needsSetup: true, isAuthenticated: false })
                 return
             }
             try {
@@ -33,15 +35,16 @@ export const useAuthStore = create<AuthState>((set) => ({
                 set({
                     isAuthenticated: true,
                     isLoading: false,
+                    hasChecked: true,
                     needsSetup: false,
                     name: me.data.name || 'Admin',
                     email: me.data.email || '',
                 })
             } catch {
-                set({ isAuthenticated: false, isLoading: false, needsSetup: false })
+                set({ isAuthenticated: false, isLoading: false, hasChecked: true, needsSetup: false })
             }
         } catch {
-            set({ isAuthenticated: false, isLoading: false, needsSetup: false })
+            set({ isAuthenticated: false, isLoading: false, hasChecked: true, needsSetup: false })
         }
     },
 
@@ -50,6 +53,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         const me = await apiClient.get('/auth/me')
         set({
             isAuthenticated: true,
+            hasChecked: true,
             needsSetup: false,
             name: me.data.name || 'Admin',
             email: me.data.email || '',
@@ -61,6 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         const me = await apiClient.get('/auth/me')
         set({
             isAuthenticated: true,
+            hasChecked: true,
             needsSetup: false,
             name: me.data.name || 'Admin',
             email: me.data.email || '',
@@ -73,14 +78,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch {
             /* swallow — we're logging out anyway */
         }
-        set({ isAuthenticated: false, name: '', email: '' })
+        set({ isAuthenticated: false, hasChecked: true, name: '', email: '' })
     },
 }))
 
 // 401 from anywhere → flip the store. Listens once at module load.
 if (typeof window !== 'undefined') {
     window.addEventListener('auth:unauthorized', () => {
-        useAuthStore.setState({ isAuthenticated: false })
+        useAuthStore.setState({ isAuthenticated: false, isLoading: false, hasChecked: true })
     })
 }
 

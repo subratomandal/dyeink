@@ -30,8 +30,24 @@ const DEFAULT_SETTINGS: SiteSettings = {
     leetcodeLink: null,
 }
 
+const PUBLIC_CONTENT_BASE = (import.meta.env.VITE_PUBLIC_CONTENT_URL || '').replace(/\/$/, '')
+
+async function getPublicSettings(): Promise<SiteSettings | null> {
+    const response = await fetch(`${PUBLIC_CONTENT_BASE}/public/settings.json`, {
+        headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) throw new Error(`Public settings request failed: ${response.status}`)
+    return response.json()
+}
+
 export const settingsService = {
     async getSettings(): Promise<SiteSettings> {
+        try {
+            return (await getPublicSettings()) ?? DEFAULT_SETTINGS
+        } catch {
+            // Fall back to the API for older deployments or before public artifacts exist.
+        }
+
         try {
             const response = await apiClient.get('/settings')
             return response.data ?? DEFAULT_SETTINGS

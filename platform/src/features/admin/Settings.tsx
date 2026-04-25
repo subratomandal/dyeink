@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, KeyRound } from 'lucide-react'
+import { AlertTriangle, Cloud, ExternalLink, Image, KeyRound } from 'lucide-react'
 import { useAdminStore } from '@/stores/adminStore'
 import { settingsService } from '@/services/settingsService'
 import { postService } from '@/services/postService'
@@ -33,8 +33,6 @@ export default function Settings() {
 
     const [siteName, setSiteName] = useState('')
     const [siteDescription, setSiteDescription] = useState('')
-    const [authorName, setAuthorName] = useState('')
-    const [authorEmail, setAuthorEmail] = useState('')
     const [newsletterEnabled, setNewsletterEnabled] = useState(false)
     const [twitterLink, setTwitterLink] = useState('')
     const [linkedinLink, setLinkedinLink] = useState('')
@@ -66,8 +64,6 @@ export default function Settings() {
         if (!settings) return
         setSiteName(settings.siteName || '')
         setSiteDescription(settings.siteDescription || '')
-        setAuthorName(settings.authorName || '')
-        setAuthorEmail(settings.authorEmail || '')
         setNewsletterEnabled(!!settings.newsletterEnabled)
         setTwitterLink(settings.twitterLink || '')
         setLinkedinLink(settings.linkedinLink || '')
@@ -84,8 +80,6 @@ export default function Settings() {
             const updated = await settingsService.saveSettings({
                 siteName,
                 siteDescription,
-                authorName,
-                authorEmail,
                 newsletterEnabled,
                 twitterLink: twitterLink || null,
                 linkedinLink: linkedinLink || null,
@@ -161,6 +155,7 @@ export default function Settings() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
                 <TabsList className="mb-6">
                     <TabsTrigger value="basics">Basics</TabsTrigger>
+                    <TabsTrigger value="deployment">Deployment</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="danger" className="data-[state=active]:text-red-500">
                         Danger Zone
@@ -194,31 +189,6 @@ export default function Settings() {
                             />
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="author-name" className="text-base font-semibold">
-                                    Author name
-                                </Label>
-                                <Input
-                                    id="author-name"
-                                    value={authorName}
-                                    onChange={(e) => setAuthorName(e.target.value)}
-                                    className="h-11"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="author-email" className="text-base font-semibold">
-                                    Author email
-                                </Label>
-                                <Input
-                                    id="author-email"
-                                    type="email"
-                                    value={authorEmail}
-                                    onChange={(e) => setAuthorEmail(e.target.value)}
-                                    className="h-11"
-                                />
-                            </div>
-                        </div>
                     </div>
 
                     <div className="space-y-3">
@@ -286,6 +256,87 @@ export default function Settings() {
                         {saving && <Spinner size={16} />}
                         {saving ? 'Saving…' : 'Save'}
                     </Button>
+                </TabsContent>
+
+                <TabsContent value="deployment" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Cloud className="h-4 w-4" />
+                                Live custom domain
+                            </CardTitle>
+                            <CardDescription>
+                                Host the live site on Cloudflare Workers, then attach your domain to the Worker.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="rounded-lg border bg-card/60 p-4 text-sm text-muted-foreground">
+                                Keep DNS on Cloudflare for the simplest TLS, caching, WAF, and R2 image-domain setup.
+                                Your app should point to the Worker custom domain, not a separate frontend host.
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <Button asChild>
+                                    <a
+                                        href="https://dash.cloudflare.com/?to=/:account/workers/services/view/dyeink/production/settings/domains"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Open domain setup
+                                        <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href="https://developers.cloudflare.com/workers/configuration/routing/custom-domains/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Custom domain guide
+                                    </a>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Image className="h-4 w-4" />
+                                Image and public-content domain
+                            </CardTitle>
+                            <CardDescription>
+                                Use an R2 custom domain for uploads and generated public JSON artifacts.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="rounded-lg border bg-card/60 p-4 text-sm text-muted-foreground">
+                                Attach a custom domain to the `dyeink-images` R2 bucket, then set `R2_PUBLIC_URL` for
+                                uploaded images. If you serve generated public JSON directly from that domain, also set
+                                `VITE_PUBLIC_CONTENT_URL` at build time.
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href="https://dash.cloudflare.com/?to=/:account/r2/default/buckets/dyeink-images/settings"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Open R2 bucket
+                                        <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href="https://developers.cloudflare.com/r2/buckets/public-buckets/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        R2 custom domain guide
+                                    </a>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <TabsContent value="security" className="space-y-6">

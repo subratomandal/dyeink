@@ -1,75 +1,54 @@
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import {
-    ArrowLeft,
-    Share2,
-    Linkedin,
-    Github,
-    Globe,
-    Dribbble,
-    Mail,
-} from 'lucide-react'
+import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Mail, Share2 } from 'lucide-react'
 import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
+import ThemeToggle from '@/components/common/ui/ThemeToggle'
+import SubscribeModal from '@/components/common/ui/SubscribeModal'
+import { useToast } from '@/components/common/feedback/Toast'
+import { useCodeCopy } from '@/hooks/useCodeCopy'
 import { postService } from '@/services/postService'
 import { settingsService, type SiteSettings } from '@/services/settingsService'
 import { statsService } from '@/services/statsService'
-import { useToast } from '@/components/common/feedback/Toast'
-import { useCodeCopy } from '@/hooks/useCodeCopy'
-import ThemeToggle from '@/components/common/ui/ThemeToggle'
-import SubscribeModal from '@/components/common/ui/SubscribeModal'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import type { Post } from '@/types'
+import type { Post, PublicPost } from '@/types'
 
-const XIcon = ({ size = 18 }: { size?: number }) => (
-    <svg
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-    >
+const XIcon = ({ size = 20 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M18.901 3H21L14.415 10.531L22.158 21H16.857L12.706 15.578L7.957 21H5.857L12.923 12.922L5.525 3H10.957L14.618 7.95L18.901 3ZM18.163 19.742H19.325L9.288 5.161H8.042L18.163 19.742Z" />
     </svg>
 )
 
-function HuggingFaceIcon({ size = 18 }: { size?: number }) {
-    return (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-        >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9 13h.01M15 13h.01M10 16s1 1 2 1 2-1 2-1" />
-        </svg>
-    )
-}
+const HuggingFaceIcon = ({ size = 20 }: { size?: number }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+    >
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+        <path d="M9 13h.01M15 13h.01M10 16s1 1 2 1 2-1 2-1" />
+    </svg>
+)
 
-function LeetCodeIcon({ size = 18 }: { size?: number }) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M13.483 0a1.374 1.374 0 0 0-.961.438L7.116 6.226l-3.854 4.126a5.266 5.266 0 0 0-1.209 2.104 5.527 5.527 0 0 0 .062 2.362 5.843 5.843 0 0 0 .349 1.017 5.938 5.938 0 0 0 1.271 1.818l4.277 4.193.039.038c2.248 2.165 5.852 2.133 8.063-.074l2.396-2.392c.54-.54.54-1.414.003-1.955a1.378 1.378 0 0 0-1.951-.003l-2.396 2.392a3.021 3.021 0 0 1-4.205.038l-.02-.019-4.276-4.193c-.652-.64-.972-1.469-.948-2.263a2.68 2.68 0 0 1 .066-.523 2.545 2.545 0 0 1 .619-1.164L9.13 8.114c1.058-1.134 3.204-1.27 4.43-.278l3.501 2.831c.593.48 1.461.387 1.94-.207a1.384 1.384 0 0 0-.207-1.943l-3.5-2.831c-.8-.647-1.766-1.045-2.774-1.202l2.015-2.158A1.384 1.384 0 0 0 13.483 0zm-2.866 12.815a1.38 1.38 0 0 0-1.38 1.382 1.38 1.38 0 0 0 1.38 1.382H20.79a1.38 1.38 0 0 0 1.38-1.382 1.38 1.38 0 0 0-1.38-1.382z" />
-        </svg>
-    )
-}
+const LeetCodeIcon = ({ size = 20 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M13.483 0a1.374 1.374 0 0 0-.961.438L7.116 6.226l-3.854 4.126a5.266 5.266 0 0 0-1.209 2.104 5.35 5.35 0 0 0-.125.513 5.527 5.527 0 0 0 .062 2.362 5.843 5.843 0 0 0 .349 1.017 5.938 5.938 0 0 0 1.271 1.818l4.277 4.193.039.038c2.248 2.165 5.852 2.133 8.063-.074l2.396-2.392c.54-.54.54-1.414.003-1.955a1.378 1.378 0 0 0-1.951-.003l-2.396 2.392a3.021 3.021 0 0 1-4.205.038l-.02-.019-4.276-4.193c-.652-.64-.972-1.469-.948-2.263a2.68 2.68 0 0 1 .066-.523 2.545 2.545 0 0 1 .619-1.164L9.13 8.114c1.058-1.134 3.204-1.27 4.43-.278l3.501 2.831c.593.48 1.461.387 1.94-.207a1.384 1.384 0 0 0-.207-1.943l-3.5-2.831c-.8-.647-1.766-1.045-2.774-1.202l2.015-2.158A1.384 1.384 0 0 0 13.483 0zm-2.866 12.815a1.38 1.38 0 0 0-1.38 1.382 1.38 1.38 0 0 0 1.38 1.382H20.79a1.38 1.38 0 0 0 1.38-1.382 1.38 1.38 0 0 0-1.38-1.382z" />
+    </svg>
+)
 
-const ITEMS_PER_PAGE = 6
+const ITEMS_PER_PAGE = 5
 
 export default function Blog() {
     const { slug } = useParams<{ slug?: string }>()
     const [searchParams, setSearchParams] = useSearchParams()
-    const [posts, setPosts] = useState<Post[] | null>(null)
+    const [posts, setPosts] = useState<PublicPost[] | null>(null)
     const [activePost, setActivePost] = useState<Post | null>(null)
+    const [activePostLoading, setActivePostLoading] = useState(false)
     const [settings, setSettings] = useState<SiteSettings | null>(null)
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -105,121 +84,178 @@ export default function Blog() {
     }, [])
 
     useEffect(() => {
-        if (!slug || !posts) {
+        if (!slug) {
             setActivePost(null)
             return
         }
-        const found = posts.find((p) => p.slug === slug) ?? null
-        setActivePost(found)
-        if (found) {
-            statsService.trackEvent(found.id, 'view').catch(() => {})
+        let cancelled = false
+        const loadPost = async () => {
+            setActivePostLoading(true)
+            const found = await postService.getPublicPostBySlug(slug)
+            if (cancelled) return
+            setActivePost(found)
+            if (found) {
+                statsService.trackEvent(found.id, 'view').catch(() => {})
+            }
+            setActivePostLoading(false)
         }
-    }, [slug, posts])
+        loadPost()
+        return () => {
+            cancelled = true
+        }
+    }, [slug])
 
     const visiblePosts = useMemo(() => {
         if (!posts) return []
-        const filtered = posts.filter((p) =>
-            p.title.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
-        return filtered
+        return posts.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
     }, [posts, searchTerm])
 
     const totalPages = Math.max(1, Math.ceil(visiblePosts.length / ITEMS_PER_PAGE))
     const pageStart = (currentPage - 1) * ITEMS_PER_PAGE
     const pagePosts = visiblePosts.slice(pageStart, pageStart + ITEMS_PER_PAGE)
 
-    const handleShare = async () => {
-        if (!activePost) return
-        const url = window.location.href
+    const handlePageChange = (page: number) => {
+        setSearchParams({ page: page.toString() })
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    const handleShare = async (post: Pick<Post, 'id' | 'slug' | 'title'>) => {
+        const permalink = `${window.location.origin}/blog/${post.slug}`
         try {
             if (navigator.share) {
-                await navigator.share({ title: activePost.title, url })
+                await navigator.share({ title: post.title, url: permalink })
             } else {
-                await navigator.clipboard.writeText(url)
-                addToast({ type: 'success', message: 'Link copied to clipboard' })
+                await navigator.clipboard.writeText(permalink)
+                addToast({ type: 'success', message: 'Link copied to clipboard', duration: 2000 })
             }
-            statsService.trackEvent(activePost.id, 'share').catch(() => {})
+            statsService.trackEvent(post.id, 'share').catch(() => {})
         } catch {
-            // user cancelled
+            // User cancelled native sharing.
         }
     }
 
-    return (
-        <div className="relative min-h-screen overflow-x-hidden">
-            <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_10%_10%,hsl(var(--card)),hsl(var(--background)))]" />
+    const detailPosts = activePost ? [activePost] : []
+    const isEmpty = !loading && !slug && visiblePosts.length === 0
+    const isDetailMissing = !!slug && !activePostLoading && !loading && !activePost
 
-            <div className="fixed right-6 top-6 z-50">
+    return (
+        <div style={{ minHeight: '100vh', position: 'relative', overflowX: 'hidden' }}>
+            <div
+                style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 0,
+                    background: 'radial-gradient(circle at 10% 10%, var(--bg-secondary), var(--bg-primary))',
+                }}
+            />
+
+            <div
+                className="blog-theme-toggle-wrapper"
+                style={{
+                    position: 'fixed',
+                    top: '1.5rem',
+                    right: '1.5rem',
+                    zIndex: 100,
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--bg-secondary)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                }}
+            >
                 <ThemeToggle />
             </div>
 
-            <div className="relative z-10 mx-auto grid max-w-5xl gap-12 px-6 py-16 lg:grid-cols-[260px_1fr]">
-                <BlogSidebar settings={settings} loading={loading} onSubscribe={() => setIsSubscribeOpen(true)} />
+            <div
+                style={{
+                    position: 'relative',
+                    zIndex: 10,
+                    maxWidth: '1000px',
+                    margin: '0 auto',
+                    padding: '4rem 2rem',
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(200px, 250px) 1fr',
+                    gap: '4rem',
+                }}
+            >
+                <BlogSidebar
+                    settings={settings}
+                    loading={loading}
+                    slug={slug}
+                    searchTerm={searchTerm}
+                    onSearchChange={(value) => {
+                        setSearchTerm(value)
+                        setSearchParams({ page: '1' })
+                    }}
+                    onSubscribe={() => setIsSubscribeOpen(true)}
+                />
 
-                <main className="min-w-0">
-                    {activePost ? (
-                        <article className="animate-fade-in">
-                            <Link
-                                to="/blog"
-                                className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-                            >
-                                <ArrowLeft className="h-4 w-4" />
-                                Back to all posts
-                            </Link>
-
-                            {activePost.coverImage && (
-                                <img
-                                    src={activePost.coverImage}
-                                    alt=""
-                                    className="mb-8 max-h-[420px] w-full rounded-xl object-cover"
-                                />
-                            )}
-
-                            <h1 className="font-heading text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-                                {activePost.title}
-                            </h1>
-                            <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
-                                <span>
-                                    {activePost.publishedAt
-                                        ? format(new Date(activePost.publishedAt), 'MMM d, yyyy')
-                                        : ''}
-                                </span>
-                                <span>·</span>
-                                <span>{(activePost.views || 0).toLocaleString()} views</span>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleShare}
-                                    className="ml-auto h-8 gap-2"
-                                >
-                                    <Share2 className="h-4 w-4" /> Share
-                                </Button>
-                            </div>
-
-                            <div
-                                ref={contentRef}
-                                className="post-content mt-8"
-                                dangerouslySetInnerHTML={{
-                                    __html: DOMPurify.sanitize(activePost.content, {
-                                        ADD_ATTR: ['target', 'rel'],
-                                    }),
-                                }}
-                            />
-                        </article>
+                <main ref={contentRef} style={{ paddingTop: '0.4rem' }}>
+                    {loading || activePostLoading ? (
+                        <div style={{ padding: '2rem 0', color: 'var(--text-muted)' }}>Loading...</div>
+                    ) : isEmpty ? (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
+                            {searchTerm ? 'No posts match that search.' : 'No posts published yet.'}
+                        </div>
+                    ) : isDetailMissing ? (
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
+                            Post not found.
+                        </div>
                     ) : (
-                        <BlogIndex
-                            loading={loading}
-                            posts={pagePosts}
-                            searchTerm={searchTerm}
-                            onSearchChange={setSearchTerm}
-                            page={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={(p) => setSearchParams({ page: p.toString() })}
-                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6rem' }}>
+                            {(slug ? detailPosts : pagePosts).map((post, index) => (
+                                <BlogArticle
+                                    key={post.id}
+                                    post={post}
+                                    isDetail={!!slug}
+                                    isLast={index === (slug ? detailPosts : pagePosts).length - 1}
+                                    onShare={() => handleShare(post)}
+                                />
+                            ))}
+
+                            {!slug && totalPages > 1 && (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        gap: '0.5rem',
+                                        alignItems: 'center',
+                                        marginTop: '2rem',
+                                    }}
+                                >
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
+                                        <button
+                                            key={number}
+                                            type="button"
+                                            onClick={() => handlePageChange(number)}
+                                            style={{
+                                                width: '32px',
+                                                height: '32px',
+                                                borderRadius: '4px',
+                                                border: '1px solid var(--border-color)',
+                                                background: currentPage === number ? 'var(--text-primary)' : 'transparent',
+                                                color: currentPage === number ? 'var(--bg-primary)' : 'var(--text-primary)',
+                                                cursor: 'pointer',
+                                                fontSize: '0.9rem',
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {number}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </main>
             </div>
 
             <SubscribeModal isOpen={isSubscribeOpen} onClose={() => setIsSubscribeOpen(false)} />
+            <BlogStyle />
         </div>
     )
 }
@@ -227,172 +263,373 @@ export default function Blog() {
 function BlogSidebar({
     settings,
     loading,
+    slug,
+    searchTerm,
+    onSearchChange,
     onSubscribe,
 }: {
     settings: SiteSettings | null
     loading: boolean
+    slug?: string
+    searchTerm: string
+    onSearchChange: (value: string) => void
     onSubscribe: () => void
 }) {
-    if (loading) {
-        return (
-            <aside className="space-y-4 lg:sticky lg:top-16 lg:self-start">
-                <Skeleton className="h-8 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-            </aside>
-        )
-    }
-
-    const socials: Array<{ href: string | null | undefined; label: string; icon: JSX.Element }> = [
-        { href: settings?.twitterLink, label: 'Twitter / X', icon: <XIcon /> },
-        { href: settings?.linkedinLink, label: 'LinkedIn', icon: <Linkedin size={18} /> },
-        { href: settings?.githubLink, label: 'GitHub', icon: <Github size={18} /> },
-        { href: settings?.dribbbleLink, label: 'Dribbble', icon: <Dribbble size={18} /> },
-        { href: settings?.huggingfaceLink, label: 'Hugging Face', icon: <HuggingFaceIcon /> },
-        { href: settings?.leetcodeLink, label: 'LeetCode', icon: <LeetCodeIcon /> },
-        { href: settings?.websiteLink, label: 'Website', icon: <Globe size={18} /> },
-    ]
-    const visibleSocials = socials.filter((s) => !!s.href)
+    const blogTitle = settings?.siteName || 'DyeInk'
+    const visibleSocials = [
+        { href: settings?.twitterLink, label: 'Follow on X / Twitter', icon: <XIcon /> },
+        { href: settings?.linkedinLink, label: 'Connect on LinkedIn', icon: <Linkedin size={20} /> },
+        { href: settings?.githubLink, label: 'View on GitHub', icon: <Github size={20} /> },
+        { href: settings?.dribbbleLink, label: 'View on Dribbble', icon: <Dribbble size={20} /> },
+        { href: settings?.leetcodeLink, label: 'View on LeetCode', icon: <LeetCodeIcon /> },
+        { href: settings?.huggingfaceLink, label: 'View on Hugging Face', icon: <HuggingFaceIcon /> },
+        { href: settings?.websiteLink, label: 'Visit Website', icon: <Globe size={20} /> },
+    ].filter((social): social is { href: string; label: string; icon: JSX.Element } => !!social.href)
 
     return (
-        <aside className="space-y-6 lg:sticky lg:top-16 lg:self-start">
-            <div>
-                <h1 className="break-words font-heading text-3xl font-normal leading-tight tracking-tight text-foreground">
-                    {settings?.siteName || 'My Blog'}
-                </h1>
-                {settings?.siteDescription && (
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                        {settings.siteDescription}
-                    </p>
-                )}
-                {settings?.authorName && (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                        By <span className="font-medium text-foreground">{settings.authorName}</span>
-                    </p>
-                )}
+        <aside style={{ position: 'sticky', top: '4rem', height: 'fit-content' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <Link
+                        to="/"
+                        style={{
+                            fontFamily: "'Jost', sans-serif",
+                            fontSize: '1.8rem',
+                            fontWeight: 400,
+                            color: 'var(--text-primary)',
+                            display: '-webkit-box',
+                            letterSpacing: '-0.03em',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'break-word',
+                            lineHeight: 1.2,
+                            textDecoration: 'none',
+                        }}
+                    >
+                        {loading ? 'DyeInk' : blogTitle}
+                    </Link>
+                </div>
             </div>
 
-            {visibleSocials.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    {visibleSocials.map((s) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {slug ? (
+                    <Link
+                        to="/blog"
+                        className="sidebar-link"
+                        style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                        <ArrowLeft size={16} /> All Posts
+                    </Link>
+                ) : (
+                    <Link to="/" className="sidebar-link" style={{ fontSize: '0.95rem', fontFamily: "'Jost', sans-serif", fontWeight: 400 }}>
+                        Home
+                    </Link>
+                )}
+
+                {settings?.newsletterEnabled && (
+                    <button
+                        type="button"
+                        onClick={onSubscribe}
+                        className="sidebar-link"
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontFamily: "'Jost', sans-serif",
+                            fontWeight: 400,
+                            fontSize: '0.95rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                        }}
+                    >
+                        <Mail size={15} /> Subscribe by email
+                    </button>
+                )}
+
+                {!slug && (
+                    <div className="sidebar-search-wrapper" style={{ margin: '0.5rem 0' }}>
+                        <input
+                            className="blog-search-input"
+                            type="text"
+                            placeholder="Search here..."
+                            value={searchTerm}
+                            onChange={(event) => onSearchChange(event.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '0.5rem',
+                                fontSize: '0.9rem',
+                                border: '1px solid var(--border-color)',
+                                background: 'transparent',
+                                borderRadius: '4px',
+                                color: 'var(--text-primary)',
+                            }}
+                        />
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    {visibleSocials.map((social) => (
                         <a
-                            key={s.label}
-                            href={s.href!}
+                            key={social.label}
+                            href={formatHref(social.href)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label={s.label}
-                            className="flex h-9 w-9 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            style={{
+                                color: 'var(--text-secondary)',
+                                transition: 'color 0.2s',
+                                display: 'inline-flex',
+                            }}
+                            onMouseEnter={(event) => {
+                                event.currentTarget.style.color = 'var(--text-primary)'
+                            }}
+                            onMouseLeave={(event) => {
+                                event.currentTarget.style.color = 'var(--text-secondary)'
+                            }}
+                            title={social.label}
+                            aria-label={social.label}
                         >
-                            {s.icon}
+                            {social.icon}
                         </a>
                     ))}
                 </div>
-            )}
-
-            {settings?.newsletterEnabled && (
-                <Button onClick={onSubscribe} className="w-full gap-2">
-                    <Mail className="h-4 w-4" /> Subscribe
-                </Button>
-            )}
+            </div>
         </aside>
     )
 }
 
-function BlogIndex({
-    loading,
-    posts,
-    searchTerm,
-    onSearchChange,
-    page,
-    totalPages,
-    onPageChange,
+function BlogArticle({
+    post,
+    isDetail,
+    isLast,
+    onShare,
 }: {
-    loading: boolean
-    posts: Post[]
-    searchTerm: string
-    onSearchChange: (v: string) => void
-    page: number
-    totalPages: number
-    onPageChange: (p: number) => void
+    post: PublicPost | Post
+    isDetail: boolean
+    isLast: boolean
+    onShare: () => void
 }) {
-    if (loading) {
-        return (
-            <div className="space-y-6">
-                {[0, 1, 2].map((i) => (
-                    <Skeleton key={i} className="h-28 w-full rounded-xl" />
-                ))}
-            </div>
-        )
-    }
+    const content = isDetail && 'content' in post ? post.content : post.excerpt
 
     return (
-        <div className="space-y-6">
-            <Input
-                placeholder="Search posts…"
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="h-11"
-            />
+        <article
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.5rem',
+                paddingBottom: '3rem',
+                borderBottom: !isLast ? '1px dashed var(--border-color)' : 'none',
+            }}
+        >
+            <header>
+                <h2
+                    style={{
+                        fontFamily: "'Jost', sans-serif",
+                        fontSize: '1.5rem',
+                        fontWeight: 400,
+                        lineHeight: 1.1,
+                        marginBottom: '0.75rem',
+                        letterSpacing: '-0.02em',
+                        color: 'var(--text-primary)',
+                        textWrap: 'balance',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                    }}
+                >
+                    {isDetail ? (
+                        post.title
+                    ) : (
+                        <Link
+                            to={`/blog/${post.slug}`}
+                            onMouseEnter={() => postService.prefetchPublicPost(post.slug)}
+                            onFocus={() => postService.prefetchPublicPost(post.slug)}
+                            style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                            {post.title}
+                        </Link>
+                    )}
+                </h2>
+            </header>
 
-            {posts.length === 0 ? (
-                <Card>
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                        {searchTerm ? 'No posts match that search.' : 'No posts yet.'}
-                    </CardContent>
-                </Card>
-            ) : (
-                <ul className="divide-y divide-border">
-                    {posts.map((p) => (
-                        <li key={p.id} className="py-6">
-                            <Link to={`/blog/${p.slug}`} className="group block">
-                                <h2 className="font-heading text-2xl font-normal leading-tight tracking-tight text-foreground group-hover:underline">
-                                    {p.title}
-                                </h2>
-                                {p.excerpt && (
-                                    <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                                        {p.excerpt}
-                                    </p>
-                                )}
-                                <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                                    {p.publishedAt && (
-                                        <span>{format(new Date(p.publishedAt), 'MMM d, yyyy')}</span>
-                                    )}
-                                    {p.views !== undefined && (
-                                        <>
-                                            <span>·</span>
-                                            <span>{p.views.toLocaleString()} views</span>
-                                        </>
-                                    )}
-                                </div>
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <div className="post-content">
+                {content ? (
+                    <div
+                        style={{
+                            color: 'var(--text-secondary)',
+                            lineHeight: 1.6,
+                            fontSize: '0.95rem',
+                            maxWidth: '700px',
+                            fontFamily: "'Jost', sans-serif",
+                            fontWeight: 400,
+                        }}
+                        dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(content, {
+                                ADD_TAGS: ['img'],
+                                ADD_ATTR: ['src', 'alt', 'width', 'height', 'style', 'target', 'rel'],
+                            }),
+                        }}
+                    />
+                ) : null}
+            </div>
 
-            {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-4">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page === 1}
-                        onClick={() => onPageChange(page - 1)}
-                    >
-                        Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                        {page} / {totalPages}
-                    </span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page === totalPages}
-                        onClick={() => onPageChange(page + 1)}
-                    >
-                        Next
-                    </Button>
+            <div
+                style={{
+                    marginTop: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: 0,
+                }}
+            >
+                <button
+                    type="button"
+                    onClick={onShare}
+                    style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        fontSize: '0.85rem',
+                        padding: 0,
+                        transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={(event) => {
+                        event.currentTarget.style.color = 'var(--text-primary)'
+                    }}
+                    onMouseLeave={(event) => {
+                        event.currentTarget.style.color = 'var(--text-secondary)'
+                    }}
+                >
+                    <Share2 size={16} /> Share
+                </button>
+
+                <div
+                    style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                    }}
+                >
+                    {post.publishedAt ? format(new Date(post.publishedAt), 'MMM d, yyyy') : null}
                 </div>
-            )}
-        </div>
+            </div>
+        </article>
+    )
+}
+
+function formatHref(href: string) {
+    return href.startsWith('http') ? href : `https://${href}`
+}
+
+function BlogStyle() {
+    return (
+        <style>{`
+            .sidebar-link {
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 1rem;
+                transition: color 0.2s;
+            }
+            .sidebar-link:hover {
+                color: var(--text-primary);
+                text-decoration: underline;
+            }
+            .post-content a {
+                color: var(--text-primary);
+                text-decoration: underline;
+            }
+            .post-content img {
+                max-width: 100%;
+                height: auto;
+                border-radius: 8px;
+                margin: 1.5rem 0;
+                display: block;
+            }
+            @media (max-width: 499px) {
+                div[style*="grid-template-columns"] {
+                    grid-template-columns: 1fr !important;
+                    gap: 1.5rem !important;
+                    padding: 1.5rem 1rem !important;
+                }
+                aside {
+                    position: relative !important;
+                    top: 0 !important;
+                    padding-bottom: 1rem !important;
+                    margin-bottom: 0.5rem;
+                }
+                aside > div:first-child {
+                    margin-bottom: 0.75rem !important;
+                }
+                aside > div:first-child a {
+                    font-size: 2.2rem !important;
+                    font-weight: 500 !important;
+                    line-height: 1.1 !important;
+                }
+                aside > div:last-child {
+                    gap: 0.2rem !important;
+                }
+                .blog-search-input {
+                    margin: 0 !important;
+                }
+                aside > div:last-child > .sidebar-search-wrapper {
+                    margin: 0 !important;
+                    margin-top: 0.6rem !important;
+                }
+                aside > div:last-child > div:last-child {
+                    flex-direction: row !important;
+                    gap: 1.25rem !important;
+                    margin: 0 !important;
+                    margin-top: 0.65rem !important;
+                    padding: 0 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    height: auto !important;
+                }
+                aside > div:last-child > div {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                main {
+                    padding-top: 0 !important;
+                }
+                main > div {
+                    gap: 3rem !important;
+                }
+                article {
+                    gap: 1rem !important;
+                    padding-bottom: 2rem !important;
+                }
+                article h2 {
+                    font-size: 1.3rem !important;
+                }
+                .blog-theme-toggle-wrapper {
+                    top: 1rem !important;
+                    right: 1rem !important;
+                    width: 36px !important;
+                    height: 36px !important;
+                }
+                .blog-theme-toggle-wrapper button {
+                    width: 36px !important;
+                    height: 36px !important;
+                }
+                .blog-search-input {
+                    width: 140px !important;
+                }
+                .post-content img {
+                    max-width: 100% !important;
+                    height: auto !important;
+                    margin: 1rem 0 !important;
+                    border-radius: 6px !important;
+                }
+            }
+        `}</style>
     )
 }

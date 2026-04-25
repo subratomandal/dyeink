@@ -13,9 +13,15 @@ import { useAuthStore } from '@/stores/authStore'
 export default function Login() {
     const navigate = useNavigate()
     const { addToast } = useToast()
-    const { isAuthenticated, isLoading, needsSetup, login } = useAuthStore()
+    const { isAuthenticated, isLoading, hasChecked, needsSetup, initialize, login } = useAuthStore()
     const [password, setPassword] = useState('')
     const [submitting, setSubmitting] = useState(false)
+
+    useEffect(() => {
+        if (!hasChecked && !isLoading) {
+            initialize()
+        }
+    }, [hasChecked, initialize, isLoading])
 
     useEffect(() => {
         if (isAuthenticated && !isLoading) navigate('/admin')
@@ -23,7 +29,7 @@ export default function Login() {
 
     if (needsSetup) return <Navigate to="/setup" replace />
 
-    if (isLoading) {
+    if (!hasChecked || isLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

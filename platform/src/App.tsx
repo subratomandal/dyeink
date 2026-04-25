@@ -19,8 +19,15 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import '@/styles/globals.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading, needsSetup } = useAuthStore()
-    if (isLoading) return <AuthShellSkeleton />
+    const { isAuthenticated, isLoading, hasChecked, needsSetup, initialize } = useAuthStore()
+
+    useEffect(() => {
+        if (!hasChecked && !isLoading) {
+            initialize()
+        }
+    }, [hasChecked, initialize, isLoading])
+
+    if (!hasChecked || isLoading) return <AuthShellSkeleton />
     if (needsSetup) return <Navigate to="/setup" replace />
     if (!isAuthenticated) return <Navigate to="/login" replace />
     return <>{children}</>
@@ -34,19 +41,7 @@ function ThemeInit() {
     return null
 }
 
-function AuthListener() {
-    const initialize = useAuthStore((state) => state.initialize)
-    useEffect(() => {
-        initialize()
-    }, [initialize])
-    return null
-}
-
 function RootRoute() {
-    const { isAuthenticated, isLoading, needsSetup } = useAuthStore()
-    if (isLoading) return <AuthShellSkeleton />
-    if (needsSetup) return <Navigate to="/setup" replace />
-    if (isAuthenticated) return <Navigate to="/admin" replace />
     return <Landing />
 }
 
@@ -55,7 +50,6 @@ function App() {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <TooltipProvider>
                 <ThemeInit />
-                <AuthListener />
                 <ToastContainer />
                 <Routes>
                     <Route path="/" element={<RootRoute />} />
