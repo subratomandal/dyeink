@@ -55,7 +55,7 @@ export function ToastContainer() {
         <div
             aria-live="polite"
             aria-atomic="false"
-            className="fixed bottom-4 right-4 z-[10000] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-3"
+            className="fixed bottom-4 left-4 right-4 z-[10000] flex max-w-[360px] flex-col gap-3 sm:left-auto sm:right-4 sm:w-[min(360px,calc(100vw-2rem))]"
         >
             {currentToasts.map((toast) => (
                 <div

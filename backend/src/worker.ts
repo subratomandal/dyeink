@@ -901,9 +901,7 @@ async function recordD1Hit(env: Bindings, id: string, type: 'view' | 'share') {
     .run()
 }
 
-app.get('/api/hit', async (c) => {
-  const id = c.req.query('id')
-  const type = c.req.query('type')
+async function handleHit(c: AppCtx, id: string | undefined, type: string | undefined) {
   if (!id || (type !== 'view' && type !== 'share')) {
     return c.json({ error: 'Invalid parameters' }, 400)
   }
@@ -915,10 +913,20 @@ app.get('/api/hit', async (c) => {
   })
 
   if (c.env.D1_HIT_ROLLUPS !== 'off') {
-    c.executionCtx.waitUntil(recordD1Hit(c.env, id, type).catch((err) => console.error(err)))
+    await recordD1Hit(c.env, id, type)
   }
 
+  c.header('Cache-Control', 'no-store, max-age=0')
   return c.json({ ok: true })
+}
+
+app.get('/api/hit', async (c) => {
+  return handleHit(c, c.req.query('id'), c.req.query('type'))
+})
+
+app.post('/api/hit', async (c) => {
+  const body = await c.req.json<{ id?: string; type?: string }>().catch(() => ({}))
+  return handleHit(c, body.id, body.type)
 })
 
 app.get('/api/stats', requireAuth, async (c) => {
@@ -967,7 +975,7 @@ app.get('/api/stats', requireAuth, async (c) => {
 // ==========================================================================
 
 app.post('/api/subscribe', async (c) => {
-  const body = await c.req.json<{ email?: string }>()
+  const body = await c.req.json<{ email?: string }>().catch(() => ({}))
   const email = body.email?.trim().toLowerCase()
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return c.json({ error: 'Invalid email' }, 400)
@@ -982,14 +990,17 @@ app.post('/api/subscribe', async (c) => {
       await c.env.DB.prepare('UPDATE subscribers SET active = 1 WHERE id = ?')
         .bind(existing.id)
         .run()
+      c.header('Cache-Control', 'no-store, max-age=0')
       return c.json({ ok: true, message: 'Subscription reactivated' })
     }
+    c.header('Cache-Control', 'no-store, max-age=0')
     return c.json({ ok: true, message: 'Already subscribed' })
   }
 
   await c.env.DB.prepare('INSERT INTO subscribers (id, email) VALUES (?, ?)')
     .bind(randomToken(12), email)
     .run()
+  c.header('Cache-Control', 'no-store, max-age=0')
   return c.json({ ok: true, message: 'Subscribed' })
 })
 

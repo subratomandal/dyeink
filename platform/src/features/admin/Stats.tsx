@@ -27,11 +27,11 @@ export default function Stats() {
     return (
         <div className="pb-16 text-foreground">
             <div className="mb-8 flex items-center justify-between">
-                <h1 className="m-0 font-heading text-4xl font-semibold">Stats</h1>
+                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Stats</h1>
             </div>
 
             <Tabs defaultValue="traffic" className="animate-fade-in">
-                <TabsList className="mb-6">
+                <TabsList className="mb-6 w-full sm:w-auto">
                     <TabsTrigger value="traffic">Traffic</TabsTrigger>
                     <TabsTrigger value="sharing">Sharing</TabsTrigger>
                 </TabsList>

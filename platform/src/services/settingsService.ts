@@ -31,6 +31,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
 }
 
 const PUBLIC_CONTENT_BASE = (import.meta.env.VITE_PUBLIC_CONTENT_URL || '').replace(/\/$/, '')
+const API_PREFETCH_TTL = 30_000
+let publicSettingsCache: Promise<SiteSettings | null> | null = null
+let apiSettingsPrefetch: { promise: Promise<SiteSettings | null>; requestedAt: number } | null = null
 
 async function getPublicSettings(): Promise<SiteSettings | null> {
     const response = await fetch(`${PUBLIC_CONTENT_BASE}/public/settings.json`, {
@@ -38,6 +41,14 @@ async function getPublicSettings(): Promise<SiteSettings | null> {
     })
     if (!response.ok) throw new Error(`Public settings request failed: ${response.status}`)
     return response.json()
+}
+
+function getCachedPublicSettings(): Promise<SiteSettings | null> {
+    publicSettingsCache ??= getPublicSettings().catch((error) => {
+        publicSettingsCache = null
+        throw error
+    })
+    return publicSettingsCache
 }
 
 async function getApiSettings(): Promise<SiteSettings | null> {
@@ -53,6 +64,12 @@ export const settingsService = {
     async getSettings({ preferFresh = false }: GetSettingsOptions = {}): Promise<SiteSettings> {
         if (preferFresh) {
             try {
+                const cached = apiSettingsPrefetch
+                if (cached && Date.now() - cached.requestedAt <= API_PREFETCH_TTL) {
+                    apiSettingsPrefetch = null
+                    return (await cached.promise) ?? DEFAULT_SETTINGS
+                }
+                apiSettingsPrefetch = null
                 return (await getApiSettings()) ?? DEFAULT_SETTINGS
             } catch {
                 // Fall through to public artifact for resilience.
@@ -60,7 +77,7 @@ export const settingsService = {
         }
 
         try {
-            return (await getPublicSettings()) ?? DEFAULT_SETTINGS
+            return (await getCachedPublicSettings()) ?? DEFAULT_SETTINGS
         } catch {
             // Fall back to the API for older deployments or before public artifacts exist.
         }
@@ -72,8 +89,26 @@ export const settingsService = {
         }
     },
 
+    prefetchSettings({ preferFresh = false }: GetSettingsOptions = {}): void {
+        if (preferFresh) {
+            apiSettingsPrefetch ??= {
+                requestedAt: Date.now(),
+                promise: getApiSettings().catch((error) => {
+                    apiSettingsPrefetch = null
+                    throw error
+                }),
+            }
+            apiSettingsPrefetch.promise.catch(() => {})
+            return
+        }
+
+        getCachedPublicSettings().catch(() => {})
+    },
+
     async saveSettings(updates: Partial<SiteSettings>): Promise<SiteSettings> {
         const response = await apiClient.put('/settings', updates)
+        publicSettingsCache = null
+        apiSettingsPrefetch = null
         return response.data
     },
 

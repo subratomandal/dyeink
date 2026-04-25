@@ -11,6 +11,7 @@ import { statsService } from '@/services/statsService'
 import type { Post, PublicPost } from '@/types'
 import { formatDateShort } from '@/lib/date'
 import { renderGitHubContent, renderMermaidDiagrams } from '@/lib/githubMarkdown'
+import { prefetchOnIntent, scheduleIdlePrefetch } from '@/lib/prefetch'
 
 const XIcon = ({ size = 20 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -112,7 +113,19 @@ export default function Blog() {
 
     const totalPages = Math.max(1, Math.ceil(visiblePosts.length / ITEMS_PER_PAGE))
     const pageStart = (currentPage - 1) * ITEMS_PER_PAGE
-    const pagePosts = visiblePosts.slice(pageStart, pageStart + ITEMS_PER_PAGE)
+    const pagePosts = useMemo(() => visiblePosts.slice(pageStart, pageStart + ITEMS_PER_PAGE), [pageStart, visiblePosts])
+    const nextPagePosts = useMemo(
+        () => visiblePosts.slice(pageStart + ITEMS_PER_PAGE, pageStart + ITEMS_PER_PAGE + 2),
+        [pageStart, visiblePosts],
+    )
+
+    useEffect(() => {
+        if (slug || pagePosts.length === 0) return
+        return scheduleIdlePrefetch(() => {
+            pagePosts.slice(0, 3).forEach((post) => postService.prefetchPublicPost(post.slug))
+            nextPagePosts.forEach((post) => postService.prefetchPublicPost(post.slug))
+        })
+    }, [nextPagePosts, pagePosts, slug])
 
     const handlePageChange = (page: number) => {
         setSearchParams({ page: page.toString() })
@@ -171,6 +184,7 @@ export default function Blog() {
             </div>
 
             <div
+                className="blog-layout-grid"
                 style={{
                     position: 'relative',
                     zIndex: 10,
@@ -277,6 +291,7 @@ function BlogSidebar({
     onSubscribe: () => void
 }) {
     const blogTitle = settings?.siteName || 'DyeInk'
+    const prefetchPostList = () => prefetchOnIntent(() => postService.prefetchPublicPosts())
     const visibleSocials = [
         { href: settings?.twitterLink, label: 'Follow on X / Twitter', icon: <XIcon /> },
         { href: settings?.linkedinLink, label: 'Connect on LinkedIn', icon: <Linkedin size={20} /> },
@@ -319,6 +334,9 @@ function BlogSidebar({
                         className="sidebar-link"
                         aria-label="Back to all posts"
                         title="Back to all posts"
+                        onMouseEnter={prefetchPostList}
+                        onFocus={prefetchPostList}
+                        onTouchStart={prefetchPostList}
                         style={{ fontSize: '0.95rem', lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                     >
                         <ArrowLeft size={18} />
@@ -368,7 +386,7 @@ function BlogSidebar({
                     />
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.1rem' }}>
+                <div className="blog-social-links" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.1rem' }}>
                     {visibleSocials.map((social) => (
                         <a
                             key={social.label}
@@ -415,6 +433,7 @@ function BlogArticle({
     const publicPreview = 'preview' in post ? post.preview : undefined
     const preview = !isDetail ? publicPreview || htmlToPlainText(post.excerpt) : ''
     const articleRef = useRef<HTMLElement>(null)
+    const prefetchPost = () => prefetchOnIntent(() => postService.prefetchPublicPost(post.slug))
     const articleHtml = useMemo(() => {
         return content ? renderGitHubContent(content, searchTerm) : ''
     }, [content, searchTerm])
@@ -455,8 +474,9 @@ function BlogArticle({
                     ) : (
                         <Link
                             to={`/blog/${post.slug}`}
-                            onMouseEnter={() => postService.prefetchPublicPost(post.slug)}
-                            onFocus={() => postService.prefetchPublicPost(post.slug)}
+                            onMouseEnter={prefetchPost}
+                            onFocus={prefetchPost}
+                            onTouchStart={prefetchPost}
                             style={{ textDecoration: 'none', color: 'inherit' }}
                         >
                             {post.title}
@@ -589,6 +609,23 @@ function BlogStyle() {
             .post-content a {
                 color: var(--text-primary);
                 text-decoration: underline;
+            }
+            .post-content [align="left"],
+            .post-content [style*="text-align: left"] {
+                text-align: left !important;
+            }
+            .post-content [align="center"],
+            .post-content [style*="text-align: center"] {
+                text-align: center !important;
+            }
+            .post-content [align="right"],
+            .post-content [style*="text-align: right"] {
+                text-align: right !important;
+            }
+            .post-content [align="justify"],
+            .post-content [style*="text-align: justify"] {
+                text-align: justify !important;
+                text-align-last: auto;
             }
             .post-content img {
                 max-width: 100%;
@@ -751,11 +788,11 @@ function BlogStyle() {
                 color: #0084ff !important;
                 padding: 0 0.08em;
             }
-            @media (max-width: 499px) {
-                div[style*="grid-template-columns"] {
+            @media (max-width: 768px) {
+                .blog-layout-grid {
                     grid-template-columns: 1fr !important;
-                    gap: 1.5rem !important;
-                    padding: 1.5rem 1rem !important;
+                    gap: 1.75rem !important;
+                    padding: 5rem 1rem 2rem !important;
                 }
                 aside {
                     position: relative !important;
@@ -767,7 +804,7 @@ function BlogStyle() {
                     margin-bottom: 0.65rem !important;
                 }
                 aside > div:first-child h1 {
-                    font-size: 2.2rem !important;
+                    font-size: clamp(1.9rem, 10vw, 2.6rem) !important;
                     font-weight: 500 !important;
                     line-height: 1.1 !important;
                 }
@@ -776,14 +813,18 @@ function BlogStyle() {
                 }
                 .blog-search-input {
                     margin: 0 !important;
+                    width: 100% !important;
+                    min-height: 44px !important;
+                    font-size: 1rem !important;
                 }
                 aside > div:last-child > .sidebar-search-wrapper {
                     margin: 0 !important;
                     margin-top: 0.45rem !important;
                 }
-                aside > div:last-child > div:last-child {
+                .blog-social-links {
                     flex-direction: row !important;
-                    gap: 0.8rem !important;
+                    flex-wrap: wrap !important;
+                    gap: 0.35rem !important;
                     margin: 0 !important;
                     margin-top: 0.45rem !important;
                     padding: 0 !important;
@@ -795,8 +836,16 @@ function BlogStyle() {
                     margin: 0 !important;
                     padding: 0 !important;
                 }
+                .blog-social-links a,
+                .sidebar-link {
+                    min-height: 44px !important;
+                    min-width: 44px !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                }
                 main {
                     padding-top: 0 !important;
+                    min-width: 0 !important;
                 }
                 main > div {
                     gap: 2rem !important;
@@ -806,7 +855,8 @@ function BlogStyle() {
                     padding-bottom: 1.5rem !important;
                 }
                 article h2 {
-                    font-size: 1.3rem !important;
+                    font-size: clamp(1.35rem, 7vw, 2rem) !important;
+                    line-height: 1.08 !important;
                 }
                 .blog-theme-toggle-wrapper {
                     top: 1rem !important;
@@ -818,14 +868,23 @@ function BlogStyle() {
                     width: 36px !important;
                     height: 36px !important;
                 }
-                .blog-search-input {
-                    width: 140px !important;
-                }
                 .post-content img {
                     max-width: 100% !important;
                     height: auto !important;
                     margin: 1rem 0 !important;
                     border-radius: 6px !important;
+                }
+                .post-content,
+                .post-content > div {
+                    max-width: 100% !important;
+                    overflow-wrap: anywhere !important;
+                }
+                .github-markdown-table,
+                .github-math-block,
+                .github-mermaid,
+                .github-diagram,
+                .github-youtube-embed {
+                    max-width: 100% !important;
                 }
             }
         `}</style>

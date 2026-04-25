@@ -59,7 +59,7 @@ export default function Login() {
     }
 
     return (
-        <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-8">
+        <div className="relative flex min-h-svh items-center justify-center overflow-hidden px-4 py-8 sm:p-8">
             <div className="pointer-events-none absolute inset-0 z-0">
                 <LightRays
                     raysOrigin="top-center"
@@ -75,7 +75,7 @@ export default function Login() {
             </div>
 
             <Card className="relative z-10 w-full max-w-sm animate-fade-in">
-                <CardContent className="p-8 sm:p-10">
+                <CardContent className="p-6 sm:p-10">
                     <div className="mb-8 text-center">
                         <img
                             src="/Di.png"

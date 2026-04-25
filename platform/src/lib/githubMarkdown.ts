@@ -132,6 +132,7 @@ function sanitizeContent(html: string) {
         ADD_ATTR: [
             'allow',
             'allowfullscreen',
+            'align',
             'aria-label',
             'checked',
             'class',
@@ -156,6 +157,10 @@ function sanitizeContent(html: string) {
 }
 
 function shouldRenderAsMarkdown(content: string) {
+    if (/\b(?:style|align)=["'][^"']*(?:text-align|justify|left|right|center)/i.test(content)) {
+        return false
+    }
+
     const tags = Array.from(content.matchAll(/<\/?([a-z][a-z0-9-]*)\b/gi)).map((match) =>
         match[1].toLowerCase(),
     )

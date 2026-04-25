@@ -4,7 +4,14 @@ import ShinyText from '../../components/common/ui/ShinyText'
 import LightRays from '../../components/common/animations/LightRays'
 import NeumorphismButton from '../../components/common/ui/NeumorphismButton'
 import PixelCard from '../../components/common/ui/PixelCard'
+import { postService } from '@/services/postService'
+import { settingsService } from '@/services/settingsService'
 export default function Landing() {
+    const prefetchBlog = () => {
+        postService.prefetchPublicPosts()
+        settingsService.prefetchSettings({ preferFresh: true })
+    }
+
     return (
         <div className="landing-page" style={{ minHeight: '100vh', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', position: 'relative', overflow: 'hidden' }}>
 
@@ -78,7 +85,7 @@ export default function Landing() {
                     A minimal, distraction-free publishing platform for writers who value clarity and silence.
                 </p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                    <NeumorphismButton to="/blog" text="Read the blog" icon={null} />
+                    <NeumorphismButton to="/blog" text="Read the blog" icon={null} onPrefetch={prefetchBlog} />
                 </div>
             </main>
 
@@ -127,10 +134,11 @@ export default function Landing() {
             <style>{`
                 @media (max-width: 499px) {
                     .landing-theme-toggle {
-                        display: none !important;
+                        top: 1rem !important;
+                        right: 1rem !important;
                     }
                     .landing-page > nav {
-                        padding: 1.25rem 1rem !important;
+                        padding: 1rem 4.5rem 1rem 1rem !important;
                     }
                     .landing-page > nav > div:first-child {
                         width: 32px !important;
@@ -140,21 +148,27 @@ export default function Landing() {
                         margin-top: 0 !important;
                     }
                     .landing-page main h1 {
-                        font-size: clamp(1.8rem, 9vw, 2.5rem) !important;
-                        margin-bottom: 0.5rem !important;
+                        font-size: clamp(2.6rem, 14vw, 4.4rem) !important;
+                        margin-bottom: 1rem !important;
                     }
                     .landing-page main p {
-                        font-size: 0.9rem !important;
+                        font-size: 1rem !important;
                         max-width: 100% !important;
                         padding: 0 0.5rem !important;
                     }
                     .landing-page main {
-                        padding: 0 0.75rem !important;
-                        min-height: calc(100vh - 120px) !important;
+                        padding: 2rem 1rem 0 !important;
+                        min-height: min(720px, calc(100svh - 80px)) !important;
                     }
                     .landing-page section {
+                        grid-template-columns: minmax(0, 1fr) !important;
                         padding: 1.5rem 0.75rem 2.5rem 0.75rem !important;
                         gap: 1rem !important;
+                    }
+                    .landing-page .neu-btn {
+                        min-height: 44px !important;
+                        padding-left: 1.1rem !important;
+                        padding-right: 1.1rem !important;
                     }
                     .landing-page footer {
                         padding: 1rem !important;
@@ -164,4 +178,3 @@ export default function Landing() {
         </div>
     )
 }
-

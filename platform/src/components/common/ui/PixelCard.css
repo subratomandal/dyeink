@@ -27,3 +27,10 @@
 .pixel-card:focus-within::before {
     opacity: 0;
 } 
+
+@media (max-width: 499px) {
+    .pixel-card {
+        width: min(100%, 280px);
+        height: 260px;
+    }
+}

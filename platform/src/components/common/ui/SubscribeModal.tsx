@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle, X } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
+import apiClient from '@/lib/apiClient'
 import { useToast } from '../feedback/Toast'
 
 interface SubscribeModalProps {
@@ -33,20 +34,7 @@ export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeMod
         e.preventDefault()
         setLoading(true)
         try {
-            const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL || '/api'}/subscribe`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, blogId }),
-                },
-            )
-
-            const data = await response.json()
-            if (!response.ok && data.error !== 'Already subscribed') {
-                throw new Error(data.error || 'Subscription failed')
-            }
-
+            await apiClient.post('/subscribe', { email: email.trim(), blogId })
             setSuccess(true)
             addToast({ type: 'success', message: 'Successfully subscribed!', duration: 3000 })
             setTimeout(() => {
@@ -151,6 +139,19 @@ export default function SubscribeModal({ isOpen, onClose, blogId }: SubscribeMod
                     .subscribe-modal-panel {
                         padding-left: 1.25rem !important;
                         padding-right: 1.25rem !important;
+                    }
+                    .subscribe-modal-panel form .relative {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        gap: 0.75rem !important;
+                    }
+                    .subscribe-modal-panel form input {
+                        padding-right: 1.25rem !important;
+                    }
+                    .subscribe-modal-panel form button {
+                        position: static !important;
+                        width: 100% !important;
+                        min-height: 44px !important;
                     }
                 }
             `}</style>

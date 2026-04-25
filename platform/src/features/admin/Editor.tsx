@@ -198,6 +198,11 @@ export default function Editor() {
     }, [loading, initialContent, title])
 
     const executeCommand = (command: string, value?: string) => document.execCommand(command, false, value)
+    const executeAlignment = (command: 'justifyLeft' | 'justifyCenter' | 'justifyRight' | 'justifyFull') => {
+        document.execCommand('styleWithCSS', false, 'true')
+        document.execCommand(command, false)
+        contentRef.current?.dispatchEvent(new Event('input', { bubbles: true }))
+    }
 
     const saveSelection = () => {
         const selection = window.getSelection()
@@ -380,8 +385,8 @@ export default function Editor() {
                 </div>
             )}
 
-            <nav className="sticky top-0 z-50 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-6 py-3">
-                <div className="flex items-center gap-3">
+            <nav className="editor-toolbar-nav sticky top-0 z-50 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-6 py-3">
+                <div className="editor-nav-start flex items-center gap-3">
                     <Button
                         variant="outline"
                         size="icon"
@@ -399,7 +404,7 @@ export default function Editor() {
                     )}
                 </div>
 
-                <div className="flex min-w-0 justify-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]">
+                <div className="editor-toolbar-scroll flex min-w-0 justify-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]">
                     <div className="flex w-max items-center justify-center gap-1">
                         <ToolbarButton onClick={() => executeCommand('undo')} title="Undo">
                             <Undo className="h-4 w-4" />
@@ -437,16 +442,16 @@ export default function Editor() {
                             <Quote className="h-4 w-4" />
                         </ToolbarButton>
                         <ToolbarDivider />
-                        <ToolbarButton onClick={() => executeCommand('justifyLeft')} title="Align Left">
+                        <ToolbarButton onClick={() => executeAlignment('justifyLeft')} title="Align Left">
                             <AlignLeft className="h-4 w-4" />
                         </ToolbarButton>
-                        <ToolbarButton onClick={() => executeCommand('justifyCenter')} title="Align Center">
+                        <ToolbarButton onClick={() => executeAlignment('justifyCenter')} title="Align Center">
                             <AlignCenter className="h-4 w-4" />
                         </ToolbarButton>
-                        <ToolbarButton onClick={() => executeCommand('justifyRight')} title="Align Right">
+                        <ToolbarButton onClick={() => executeAlignment('justifyRight')} title="Align Right">
                             <AlignRight className="h-4 w-4" />
                         </ToolbarButton>
-                        <ToolbarButton onClick={() => executeCommand('justifyFull')} title="Justify">
+                        <ToolbarButton onClick={() => executeAlignment('justifyFull')} title="Justify">
                             <AlignJustify className="h-4 w-4" />
                         </ToolbarButton>
                         <ToolbarDivider />
@@ -459,7 +464,7 @@ export default function Editor() {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3">
+                <div className="editor-nav-actions flex items-center justify-end gap-3">
                     <Button
                         onClick={() => handleSave(true)}
                         disabled={saving}
@@ -471,7 +476,7 @@ export default function Editor() {
                 </div>
             </nav>
 
-            <div className="mx-auto max-w-[720px] px-6 pb-12 pt-20">
+            <div className="editor-body mx-auto max-w-[720px] px-6 pb-12 pt-20">
                 <div
                     ref={titleRef}
                     contentEditable
@@ -528,9 +533,40 @@ export default function Editor() {
                 .editor-content-editable img { max-width: 100% !important; height: auto !important; border-radius: 0.5rem; margin: 1rem 0; display: block; }
                 .editor-content-editable a { color: hsl(var(--foreground)); text-decoration: underline; }
                 @media (max-width: 640px) {
-                    .editor-page nav {
+                    .editor-toolbar-nav {
+                        grid-template-columns: auto 1fr !important;
+                        grid-template-areas:
+                            "start actions"
+                            "tools tools" !important;
+                        gap: 0.6rem !important;
                         padding-left: 0.75rem !important;
                         padding-right: 0.75rem !important;
+                    }
+                    .editor-nav-start { grid-area: start; min-width: 0; }
+                    .editor-nav-actions { grid-area: actions; }
+                    .editor-nav-actions button {
+                        min-width: 0 !important;
+                        padding-left: 1rem !important;
+                        padding-right: 1rem !important;
+                    }
+                    .editor-toolbar-scroll {
+                        grid-area: tools;
+                        justify-content: flex-start !important;
+                        margin: 0 -0.25rem;
+                        padding: 0.15rem 0.25rem 0.05rem;
+                    }
+                    .editor-toolbar-scroll button {
+                        width: 40px !important;
+                        height: 40px !important;
+                    }
+                    .editor-toolbar-scroll [data-orientation="vertical"] {
+                        margin-left: 0.15rem !important;
+                        margin-right: 0.15rem !important;
+                    }
+                    .editor-body {
+                        padding-left: 1rem !important;
+                        padding-right: 1rem !important;
+                        padding-top: 2.5rem !important;
                     }
                     .editor-title-editable { font-size: 2rem !important; }
                     .editor-title-editable:empty:before { font-size: 2rem !important; }

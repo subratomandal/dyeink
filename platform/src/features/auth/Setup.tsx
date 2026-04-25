@@ -66,7 +66,7 @@ export default function Setup() {
     }
 
     return (
-        <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-8">
+        <div className="relative flex min-h-svh items-center justify-center overflow-hidden px-4 py-8 sm:p-8">
             <div className="pointer-events-none absolute inset-0 z-0">
                 <LightRays
                     raysOrigin="top-center"
@@ -82,7 +82,7 @@ export default function Setup() {
             </div>
 
             <Card className="relative z-10 w-full max-w-md animate-fade-in">
-                <CardContent className="p-8 sm:p-10">
+                <CardContent className="p-6 sm:p-10">
                     <div className="mb-6 text-center">
                         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <Sparkles className="h-6 w-6" />

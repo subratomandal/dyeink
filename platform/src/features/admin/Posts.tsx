@@ -51,15 +51,15 @@ export default function Posts() {
 
     return (
         <div className="mx-auto max-w-5xl pb-16">
-            <div className="mb-12">
-                <h1 className="m-0 font-heading text-4xl font-semibold">Published Posts</h1>
-                <p className="mt-2 text-lg text-muted-foreground">Manage your live content.</p>
+            <div className="mb-8 sm:mb-12">
+                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Published Posts</h1>
+                <p className="mt-2 text-base text-muted-foreground sm:text-lg">Manage your live content.</p>
             </div>
 
             {showLoader ? (
                 <PostsSkeleton />
             ) : filteredPosts.length === 0 ? (
-                <div className="animate-fade-in rounded-md border border-dashed border-border p-16 text-center text-muted-foreground">
+                <div className="animate-fade-in rounded-md border border-dashed border-border p-8 text-center text-muted-foreground sm:p-16">
                     No published posts yet.
                 </div>
             ) : (
@@ -110,7 +110,7 @@ export default function Posts() {
                                 </div>
 
                                 <div className="flex justify-end gap-2">
-                                    <Button asChild size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground">
+                                    <Button asChild size="icon" variant="ghost" className="h-10 w-10 rounded-full text-muted-foreground hover:text-foreground md:h-8 md:w-8">
                                         <Link to={`/admin/posts/${post.id}/edit`} aria-label={`Edit ${post.title}`}>
                                             <SquarePen className="h-4 w-4" />
                                         </Link>
@@ -118,7 +118,7 @@ export default function Posts() {
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
+                                        className="h-10 w-10 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500 md:h-8 md:w-8"
                                         onClick={() => setPostToDelete(post.id)}
                                         aria-label={`Delete ${post.title}`}
                                     >

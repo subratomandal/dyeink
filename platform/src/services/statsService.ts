@@ -15,7 +15,15 @@ export interface BasicStats {
 export const statsService = {
     async trackEvent(postId: string, type: 'view' | 'share'): Promise<void> {
         try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api'}/hit?id=${postId}&type=${type}`)
+            await apiClient.post(
+                '/hit',
+                { id: postId, type },
+                {
+                    cache: 'no-store',
+                    keepalive: true,
+                    headers: { 'Cache-Control': 'no-store' },
+                },
+            )
         } catch (error) {
             console.error('Error tracking event:', error)
         }

@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { prefetchOnIntent } from '@/lib/prefetch';
 import './NeumorphismButton.css';
 interface NeumorphismButtonProps {
     text?: string;
     to?: string;
     onClick?: () => void;
+    onPrefetch?: () => void;
     icon?: React.ReactNode;
     type?: 'button' | 'submit' | 'reset';
     className?: string; 
@@ -15,11 +17,16 @@ const NeumorphismButton: React.FC<NeumorphismButtonProps> = ({
     text = "Start Writing",
     to,
     onClick,
+    onPrefetch,
     icon,
     type = 'button',
     className = '',
     style = {}
 }) => {
+    const handlePrefetch = () => {
+        if (onPrefetch) prefetchOnIntent(onPrefetch);
+    };
+
     const content = (
         <>
             {icon === undefined ? <ArrowRight size={18} /> : icon}
@@ -28,7 +35,14 @@ const NeumorphismButton: React.FC<NeumorphismButtonProps> = ({
     );
     if (to) {
         return (
-            <Link to={to} className={`neu-btn ${className}`} style={style}>
+            <Link
+                to={to}
+                className={`neu-btn ${className}`}
+                style={style}
+                onMouseEnter={handlePrefetch}
+                onFocus={handlePrefetch}
+                onTouchStart={handlePrefetch}
+            >
                 {content}
             </Link>
         );

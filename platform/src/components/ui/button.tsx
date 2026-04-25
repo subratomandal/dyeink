@@ -18,10 +18,10 @@ const variantClass: Record<ButtonVariant, string> = {
 }
 
 const sizeClass: Record<ButtonSize, string> = {
-  default: 'h-9 px-4 py-2',
-  sm: 'h-8 rounded-md px-3 text-xs',
+  default: 'h-11 min-h-11 px-4 py-2 sm:h-9 sm:min-h-9',
+  sm: 'h-10 min-h-10 rounded-md px-3 text-xs sm:h-8 sm:min-h-8',
   lg: 'h-10 rounded-md px-8',
-  icon: 'h-9 w-9',
+  icon: 'h-11 w-11 sm:h-9 sm:w-9',
 }
 
 export function buttonVariants({

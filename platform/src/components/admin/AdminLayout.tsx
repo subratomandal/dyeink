@@ -9,6 +9,9 @@ import DecryptedText from '@/components/common/animations/DecryptedText'
 import AdminGreeting from './AdminGreeting'
 import NewPostButton from './sidebar/NewPostButton'
 import { cn } from '@/lib/utils'
+import { prefetchOnIntent, scheduleIdlePrefetch } from '@/lib/prefetch'
+import { postService } from '@/services/postService'
+import { settingsService } from '@/services/settingsService'
 
 function SidebarLink({
     to,
@@ -16,17 +19,26 @@ function SidebarLink({
     label,
     active,
     external = false,
+    onPrefetch,
 }: {
     to: string
     icon: typeof Home
     label: string
     active?: boolean
     external?: boolean
+    onPrefetch?: () => void
 }) {
+    const handlePrefetch = () => {
+        if (onPrefetch) prefetchOnIntent(onPrefetch)
+    }
+
     return (
         <Link
             to={to}
             target={external ? '_blank' : undefined}
+            onMouseEnter={handlePrefetch}
+            onFocus={handlePrefetch}
+            onTouchStart={handlePrefetch}
             className={cn(
                 'flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-normal transition-colors',
                 active
@@ -89,7 +101,36 @@ export default function AdminLayout() {
         fetchSettings(true)
     }, [isAuthenticated, fetchSettings])
 
+    useEffect(() => {
+        if (!isAuthenticated) return
+        return scheduleIdlePrefetch(() => {
+            postService.prefetchPublicPosts()
+            settingsService.prefetchSettings({ preferFresh: true })
+        }, 1800)
+    }, [isAuthenticated])
+
     const isActive = (path: string) => location.pathname === path
+    const prefetchDashboard = () => {
+        const store = useAdminStore.getState()
+        void store.fetchPosts()
+        void store.fetchStats()
+        void store.fetchSettings()
+    }
+    const prefetchPosts = () => {
+        void useAdminStore.getState().fetchPosts()
+    }
+    const prefetchStats = () => {
+        const store = useAdminStore.getState()
+        void store.fetchPosts()
+        void store.fetchStats()
+    }
+    const prefetchSettings = () => {
+        void useAdminStore.getState().fetchSettings()
+    }
+    const prefetchLiveBlog = () => {
+        postService.prefetchPublicPosts()
+        settingsService.prefetchSettings({ preferFresh: true })
+    }
 
     const handleSignOut = async () => {
         setIsLoggingOut(true)
@@ -108,16 +149,17 @@ export default function AdminLayout() {
                     <AdminGreeting name={greetingName} />
                 </div>
 
-                <NewPostButton />
+                <NewPostButton onPrefetch={prefetchSettings} />
 
                 <nav className="flex flex-1 flex-col gap-1 px-5 pb-4">
                     <SectionLabel>Menu</SectionLabel>
-                    <SidebarLink to="/admin" icon={Home} label="Home" active={isActive('/admin')} />
+                    <SidebarLink to="/admin" icon={Home} label="Home" active={isActive('/admin')} onPrefetch={prefetchDashboard} />
                     <SidebarLink
                         to="/admin/posts"
                         icon={FileText}
                         label="Posts"
                         active={isActive('/admin/posts')}
+                        onPrefetch={prefetchPosts}
                     />
 
                     <SectionLabel>Audience</SectionLabel>
@@ -126,6 +168,7 @@ export default function AdminLayout() {
                         icon={BarChart2}
                         label="Stats"
                         active={isActive('/admin/stats')}
+                        onPrefetch={prefetchStats}
                     />
 
                     <SectionLabel>Tools</SectionLabel>
@@ -134,8 +177,9 @@ export default function AdminLayout() {
                         icon={Settings}
                         label="Settings"
                         active={isActive('/admin/settings')}
+                        onPrefetch={prefetchSettings}
                     />
-                    <SidebarLink to="/blog" icon={Globe} label="Live ↗" external />
+                    <SidebarLink to="/blog" icon={Globe} label="Live ↗" external onPrefetch={prefetchLiveBlog} />
                 </nav>
 
                 <div className="p-5">
@@ -149,13 +193,13 @@ export default function AdminLayout() {
                 </div>
             </aside>
 
-            <main className="relative ml-[260px] h-screen flex-1 overflow-hidden bg-background">
+            <main className="admin-main relative ml-[260px] h-screen flex-1 overflow-hidden bg-background">
                 <div className="absolute right-6 top-6 z-50">
                     <ThemeToggle />
                 </div>
 
-                <div className="absolute inset-0 z-10 overflow-y-auto overflow-x-hidden">
-                    <div className="mx-auto max-w-[1000px] px-8 py-10">
+                <div className="admin-scroll absolute inset-0 z-10 overflow-y-auto overflow-x-hidden">
+                    <div className="admin-content mx-auto max-w-[1000px] px-8 py-10">
                         <Outlet />
                     </div>
                 </div>
@@ -163,22 +207,63 @@ export default function AdminLayout() {
 
             <style>{`
                 @media (max-width: 640px) {
-                    aside { width: 70px !important; }
-                    aside .px-5, aside .pb-6 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-                    aside nav { align-items: center; }
+                    aside {
+                        top: auto !important;
+                        bottom: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        width: 100% !important;
+                        height: 76px !important;
+                        flex-direction: row !important;
+                        align-items: center !important;
+                        border-right: 0 !important;
+                        border-top: 1px solid hsl(var(--border)) !important;
+                        overflow-x: auto !important;
+                        overflow-y: hidden !important;
+                        padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
+                    }
+                    aside > div:first-child,
+                    aside [data-section-label] { display: none !important; }
+                    aside .px-5,
+                    aside .pb-6 {
+                        padding-left: 0.35rem !important;
+                        padding-right: 0.35rem !important;
+                        padding-bottom: 0 !important;
+                    }
+                    aside nav {
+                        min-width: 0;
+                        flex: 1 1 auto;
+                        flex-direction: row !important;
+                        align-items: center;
+                        justify-content: space-around;
+                        gap: 0.15rem !important;
+                        padding: 0 0.25rem !important;
+                    }
                     aside nav a span,
                     aside button span,
-                    aside [data-greeting],
-                    aside [data-section-label] { display: none !important; }
+                    aside [data-greeting] { display: none !important; }
                     aside nav a, aside button {
                         justify-content: center;
-                        width: 44px; height: 44px; padding: 0;
+                        width: 44px !important;
+                        height: 44px !important;
+                        padding: 0 !important;
                         border-radius: 9999px;
                         margin: 0 auto;
                     }
-                    main { margin-left: 70px !important; }
-                    main .mx-auto { padding: 5rem 1rem 2rem !important; }
-                    main > .absolute.right-6.top-6 {
+                    aside > div:last-child {
+                        padding: 0 0.35rem !important;
+                    }
+                    .admin-main {
+                        margin-left: 0 !important;
+                        height: 100dvh !important;
+                    }
+                    .admin-scroll {
+                        padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+                    }
+                    .admin-content {
+                        padding: 5rem 1rem 2rem !important;
+                    }
+                    .admin-main > .absolute.right-6.top-6 {
                         top: 1rem !important;
                         right: 1rem !important;
                     }

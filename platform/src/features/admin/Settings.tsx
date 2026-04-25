@@ -148,11 +148,11 @@ export default function Settings() {
     return (
         <div className="pb-16 text-foreground">
             <div className="mb-8 flex items-center justify-between">
-                <h1 className="m-0 font-heading text-4xl font-semibold">Settings</h1>
+                <h1 className="m-0 font-heading text-3xl font-semibold sm:text-4xl">Settings</h1>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-3xl">
-                <TabsList className="mb-6">
+                <TabsList className="mb-6 w-full sm:w-auto">
                     <TabsTrigger value="basics">Basics</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="danger" className="data-[state=active]:text-red-500">
@@ -177,7 +177,7 @@ export default function Settings() {
                     </div>
 
                     <div className="space-y-3">
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 className="text-base font-semibold">Newsletter</h3>
                                 <p className="mt-1 text-sm text-muted-foreground">
@@ -237,7 +237,7 @@ export default function Settings() {
                         </div>
                     </div>
 
-                    <Button onClick={handleSave} disabled={saving}>
+                    <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
                         {saving && <Spinner size={16} />}
                         {saving ? 'Saving…' : 'Save'}
                     </Button>
@@ -291,6 +291,7 @@ export default function Settings() {
                             <Button
                                 onClick={handleChangePassword}
                                 disabled={pwSaving || !currentPw || !nextPw || nextPw !== confirmPw}
+                                className="w-full sm:w-auto"
                             >
                                 {pwSaving && <Spinner size={16} />}
                                 {pwSaving ? 'Updating…' : 'Update password'}
@@ -310,7 +311,7 @@ export default function Settings() {
                         <CardContent>
                             <Button
                                 variant="outline"
-                                className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                                className="w-full border-red-500 text-red-500 hover:bg-red-500 hover:text-white sm:w-auto"
                                 onClick={() => {
                                     setShowDeletePosts(true)
                                     setDeleteConfirmation('')

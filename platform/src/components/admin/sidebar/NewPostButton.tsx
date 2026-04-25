@@ -1,12 +1,20 @@
 import { Link } from 'react-router-dom'
+import { prefetchOnIntent } from '@/lib/prefetch'
 
-export default function NewPostButton() {
+export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void }) {
+    const handlePrefetch = () => {
+        if (onPrefetch) prefetchOnIntent(onPrefetch)
+    }
+
     return (
         <div className="new-post-btn px-5 pb-6">
             <Link
                 to="/admin/posts/new"
                 aria-label="New post"
                 title="New post"
+                onMouseEnter={handlePrefetch}
+                onFocus={handlePrefetch}
+                onTouchStart={handlePrefetch}
                 className="magic-button relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold text-white shadow-[0_0_10px_rgba(168,85,247,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
             >
                 <span className="magic-text magic-text-full">New Post</span>
