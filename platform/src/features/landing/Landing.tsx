@@ -1,7 +1,7 @@
 import { PenTool, Layout, Lock, Github } from 'lucide-react'
 import ThemeToggle from '../../components/common/ui/ThemeToggle'
 import ShinyText from '../../components/common/ui/ShinyText'
-import LightRays from '../../components/common/animations/LightRays'
+import Dither from '../../components/common/animations/Dither'
 import NeumorphismButton from '../../components/common/ui/NeumorphismButton'
 import PixelCard from '../../components/common/ui/PixelCard'
 import { postService } from '@/services/postService'
@@ -15,19 +15,19 @@ export default function Landing() {
     return (
         <div className="landing-page" style={{ minHeight: '100vh', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', position: 'relative', overflow: 'hidden' }}>
 
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
-                <LightRays
-                    raysOrigin="top-center"
-                    raysColor="#00ffff"
-                    raysSpeed={2.0}
-                    lightSpread={5.0}
-                    rayLength={10.0}
-                    followMouse={true}
-                    mouseInfluence={0.2}
-                    noiseAmount={0.1}
-                    distortion={0.1}
+            <div className="landing-dither-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.62 }}>
+                <Dither
+                    waveColor={[0.5, 0.5, 0.5]}
+                    disableAnimation={false}
+                    enableMouseInteraction
+                    mouseRadius={0.3}
+                    colorNum={4}
+                    waveAmplitude={0.3}
+                    waveFrequency={3}
+                    waveSpeed={0.05}
                 />
             </div>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none', background: 'radial-gradient(circle at 50% 42%, transparent 0%, color-mix(in srgb, var(--bg-primary) 52%, transparent) 62%, var(--bg-primary) 100%)' }} />
 
             <div className="landing-theme-toggle" style={{
                 position: 'fixed',
