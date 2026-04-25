@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { PenSquare } from 'lucide-react'
 
 export default function NewPostButton() {
     return (
@@ -8,7 +7,6 @@ export default function NewPostButton() {
                 to="/admin/posts/new"
                 className="magic-button relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold text-white shadow-[0_0_10px_rgba(168,85,247,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
             >
-                <PenSquare className="magic-icon h-4 w-4" />
                 <span className="magic-text">New Post</span>
             </Link>
 
@@ -56,12 +54,17 @@ export default function NewPostButton() {
                     letter-spacing: 0.02em;
                     transition: color 0.3s ease;
                 }
-                .magic-icon { color: hsl(var(--foreground)); z-index: 10; position: relative; transition: color 0.3s ease; }
-                .magic-button:hover .magic-text,
-                .magic-button:hover .magic-icon {
+                .magic-button:hover .magic-text {
                     color: #ffffff;
                     background: none;
                     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                }
+                @media (max-width: 640px) {
+                    .new-post-btn .magic-text {
+                        display: inline !important;
+                        font-size: 0.72rem;
+                        letter-spacing: 0;
+                    }
                 }
                 @keyframes magic-rotate {
                     from { transform: rotate(0deg); }

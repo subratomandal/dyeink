@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Mail, Share2 } from 'lucide-react'
+import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Share2 } from 'lucide-react'
 import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
@@ -149,24 +149,7 @@ export default function Blog() {
                 }}
             />
 
-            <div
-                className="blog-theme-toggle-wrapper"
-                style={{
-                    position: 'fixed',
-                    top: '1.5rem',
-                    right: '1.5rem',
-                    zIndex: 100,
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '50%',
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--bg-secondary)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                }}
-            >
+            <div className="fixed right-6 top-6 z-50">
                 <ThemeToggle />
             </div>
 
@@ -290,8 +273,7 @@ function BlogSidebar({
         <aside style={{ position: 'sticky', top: '4rem', height: 'fit-content' }}>
             <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                    <Link
-                        to="/"
+                    <h1
                         style={{
                             fontFamily: "'Jost', sans-serif",
                             fontSize: '1.8rem',
@@ -304,11 +286,11 @@ function BlogSidebar({
                             overflow: 'hidden',
                             wordBreak: 'break-word',
                             lineHeight: 1.2,
-                            textDecoration: 'none',
+                            margin: 0,
                         }}
                     >
                         {loading ? 'DyeInk' : blogTitle}
-                    </Link>
+                    </h1>
                 </div>
             </div>
 
@@ -321,11 +303,7 @@ function BlogSidebar({
                     >
                         <ArrowLeft size={16} /> All Posts
                     </Link>
-                ) : (
-                    <Link to="/" className="sidebar-link" style={{ fontSize: '0.95rem', fontFamily: "'Jost', sans-serif", fontWeight: 400 }}>
-                        Home
-                    </Link>
-                )}
+                ) : null}
 
                 {settings?.newsletterEnabled && (
                     <button
@@ -346,7 +324,7 @@ function BlogSidebar({
                             gap: '0.5rem',
                         }}
                     >
-                        <Mail size={15} /> Subscribe by email
+                        Subscribe by email
                     </button>
                 )}
 
@@ -412,7 +390,9 @@ function BlogArticle({
     isLast: boolean
     onShare: () => void
 }) {
-    const content = isDetail && 'content' in post ? post.content : post.excerpt
+    const content = isDetail && 'content' in post ? post.content : ''
+    const publicPreview = 'preview' in post ? post.preview : undefined
+    const preview = !isDetail ? publicPreview || htmlToPlainText(post.excerpt) : ''
 
     return (
         <article
@@ -454,9 +434,32 @@ function BlogArticle({
                 </h2>
             </header>
 
-            <div className="post-content">
-                {content ? (
-                    <div
+            {isDetail ? (
+                <div className="post-content">
+                    {content ? (
+                        <div
+                            style={{
+                                color: 'var(--text-secondary)',
+                                lineHeight: 1.6,
+                                fontSize: '0.95rem',
+                                maxWidth: '700px',
+                                fontFamily: "'Jost', sans-serif",
+                                fontWeight: 400,
+                            }}
+                            dangerouslySetInnerHTML={{
+                                __html: DOMPurify.sanitize(content, {
+                                    ADD_TAGS: ['img'],
+                                    ADD_ATTR: ['src', 'alt', 'width', 'height', 'style', 'target', 'rel'],
+                                }),
+                            }}
+                        />
+                    ) : null}
+                </div>
+            ) : (
+                preview && (
+                    <p
+                        className="blog-post-preview"
+                        title={preview}
                         style={{
                             color: 'var(--text-secondary)',
                             lineHeight: 1.6,
@@ -464,16 +467,13 @@ function BlogArticle({
                             maxWidth: '700px',
                             fontFamily: "'Jost', sans-serif",
                             fontWeight: 400,
+                            margin: 0,
                         }}
-                        dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(content, {
-                                ADD_TAGS: ['img'],
-                                ADD_ATTR: ['src', 'alt', 'width', 'height', 'style', 'target', 'rel'],
-                            }),
-                        }}
-                    />
-                ) : null}
-            </div>
+                    >
+                        {preview}
+                    </p>
+                )
+            )}
 
             <div
                 style={{
@@ -529,6 +529,21 @@ function formatHref(href: string) {
     return href.startsWith('http') ? href : `https://${href}`
 }
 
+function htmlToPlainText(value: string) {
+    return value
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
 function BlogStyle() {
     return (
         <style>{`
@@ -553,6 +568,13 @@ function BlogStyle() {
                 margin: 1.5rem 0;
                 display: block;
             }
+            .blog-post-preview {
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
             @media (max-width: 499px) {
                 div[style*="grid-template-columns"] {
                     grid-template-columns: 1fr !important;
@@ -568,7 +590,7 @@ function BlogStyle() {
                 aside > div:first-child {
                     margin-bottom: 0.75rem !important;
                 }
-                aside > div:first-child a {
+                aside > div:first-child h1 {
                     font-size: 2.2rem !important;
                     font-weight: 500 !important;
                     line-height: 1.1 !important;
@@ -610,13 +632,11 @@ function BlogStyle() {
                 article h2 {
                     font-size: 1.3rem !important;
                 }
-                .blog-theme-toggle-wrapper {
+                div.fixed.right-6.top-6.z-50 {
                     top: 1rem !important;
                     right: 1rem !important;
-                    width: 36px !important;
-                    height: 36px !important;
                 }
-                .blog-theme-toggle-wrapper button {
+                div.fixed.right-6.top-6.z-50 button {
                     width: 36px !important;
                     height: 36px !important;
                 }

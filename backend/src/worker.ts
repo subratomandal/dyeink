@@ -61,6 +61,7 @@ type AppCtx = Context<{ Bindings: Bindings; Variables: Variables }>
 
 const PUBLIC_JSON_CACHE = 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
 const PUBLIC_ARTIFACT_PREFIX = 'public'
+const PUBLIC_POSTS_SCHEMA_VERSION = 2
 
 function hashString(input: string): string {
   let hash = 2166136261
@@ -96,6 +97,7 @@ async function cachedArtifactJson(
   key: string,
   fallback: () => Promise<unknown>,
   cacheControl = PUBLIC_JSON_CACHE,
+  isArtifactFresh?: (body: string) => boolean,
 ) {
   const object = await c.env.IMAGES.get(key)
   if (object) {
@@ -105,16 +107,41 @@ async function cachedArtifactJson(
     headers.set('cache-control', cacheControl)
     headers.set('etag', object.httpEtag)
 
-    if (c.req.header('if-none-match') === object.httpEtag) {
-      return new Response(null, { status: 304, headers })
+    if (isArtifactFresh) {
+      const body = await object.text()
+      if (isArtifactFresh(body)) {
+        if (c.req.header('if-none-match') === object.httpEtag) {
+          return new Response(null, { status: 304, headers })
+        }
+        return new Response(body, { headers })
+      }
+    } else {
+      if (c.req.header('if-none-match') === object.httpEtag) {
+        return new Response(null, { status: 304, headers })
+      }
+      return new Response(object.body, { headers })
     }
-
-    return new Response(object.body, { headers })
   }
 
   const body = await fallback()
   c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return cachedJson(c, body, cacheControl)
+}
+
+function isFreshPublicPostsArtifact(body: string) {
+  try {
+    const payload = JSON.parse(body) as {
+      schemaVersion?: number
+      posts?: Array<{ preview?: unknown }>
+    }
+    return (
+      payload.schemaVersion === PUBLIC_POSTS_SCHEMA_VERSION &&
+      Array.isArray(payload.posts) &&
+      payload.posts.every((post) => typeof post.preview === 'string')
+    )
+  } catch {
+    return false
+  }
 }
 
 async function getSessionSecret(c: AppCtx): Promise<string | null> {
@@ -409,7 +436,28 @@ interface PostRow {
   updated_at: number
 }
 
-type PublicPostRow = Omit<PostRow, 'content'>
+type PublicPostRow = PostRow
+
+function htmlToPreviewText(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function buildPostPreview(excerpt: string, content: string) {
+  const text = htmlToPreviewText(excerpt || content || '')
+  if (text.length <= 280) return text
+  return `${text.slice(0, 280).trimEnd()}...`
+}
 
 function serializePost(p: PostRow) {
   return {
@@ -434,6 +482,7 @@ function serializePublicPost(p: PublicPostRow) {
     title: p.title,
     slug: p.slug,
     excerpt: p.excerpt,
+    preview: buildPostPreview(p.excerpt, p.content),
     coverImage: p.cover_image || '',
     published: !!p.published,
     publishedAt: p.published_at ? new Date(p.published_at * 1000).toISOString() : null,
@@ -447,12 +496,16 @@ function serializePublicPost(p: PublicPostRow) {
 async function getPublicPostsPayload(db: D1Database) {
   const { results } = await db
     .prepare(
-      `SELECT id, title, slug, excerpt, cover_image, published, published_at,
+      `SELECT id, title, slug, content, excerpt, cover_image, published, published_at,
        views, shares, created_at, updated_at
        FROM posts WHERE published = 1 ORDER BY published_at DESC`,
     )
     .all<PublicPostRow>()
-  return { posts: results.map(serializePublicPost), total: results.length }
+  return {
+    schemaVersion: PUBLIC_POSTS_SCHEMA_VERSION,
+    posts: results.map(serializePublicPost),
+    total: results.length,
+  }
 }
 
 async function getPublicPostPayload(db: D1Database, slug: string) {
@@ -720,6 +773,8 @@ app.get('/public/posts.json', async (c) => {
     c,
     `${PUBLIC_ARTIFACT_PREFIX}/posts.json`,
     () => getPublicPostsPayload(c.env.DB),
+    PUBLIC_JSON_CACHE,
+    isFreshPublicPostsArtifact,
   )
 })
 

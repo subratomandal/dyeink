@@ -271,8 +271,10 @@ export default function Settings() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="rounded-lg border bg-card/60 p-4 text-sm text-muted-foreground">
-                                Keep DNS on Cloudflare for the simplest TLS, caching, WAF, and R2 image-domain setup.
-                                Your app should point to the Worker custom domain, not a separate frontend host.
+                                Cloudflare supports Worker custom domains from the dashboard, Wrangler, and API for
+                                domains in your Cloudflare account. The old in-app Vercel flow in Git used Vercel's
+                                project-domain API; the Cloudflare equivalent for customer-owned domains is Cloudflare
+                                for SaaS custom hostnames, which needs a separate SaaS-zone setup.
                             </div>
                             <div className="flex flex-wrap gap-3">
                                 <Button asChild>
@@ -292,6 +294,15 @@ export default function Settings() {
                                         rel="noopener noreferrer"
                                     >
                                         Custom domain guide
+                                    </a>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <a
+                                        href="https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        SaaS domain API
                                     </a>
                                 </Button>
                             </div>

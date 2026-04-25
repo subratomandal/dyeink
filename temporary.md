@@ -140,3 +140,45 @@ Verification:
 - `npx wrangler deploy --dry-run` reached `--dry-run: exiting now`.
 - Dry-run binding list now contains `DB`, `IMAGES`, `ASSETS`, and `D1_HIT_ROLLUPS`; it no longer contains `ANALYTICS`.
 - Wrangler printed a local log-file permission warning for `/Users/subratomandal/Library/Preferences/.wrangler/logs/...`, but the dry-run process exited successfully.
+
+## Follow-Up: Blog Visitor UI And Domain UX
+
+User request on 2026-04-25:
+- Check whether Cloudflare has Vercel-like one-click custom domain support and inspect previous Vercel/custom-domain implementation from Git history if present.
+- In live blog visitor page, blog name should not be clickable.
+- In live blog visitor page, remove the `Home` link because this page is for visitors.
+- Remove the mail icon from `Subscribe by email`.
+- Main blog listing should show a visible content preview, not title-only.
+- Preview should show about 3 lines and end with ellipsis for huge text.
+- Keep pagination so huge post lists remain paged.
+- Fix live blog theme-toggle button to look the same as dashboard.
+- Remove the icon from the New Post button.
+- Implement properly without changing backend/deploy optimizations.
+
+Execution constraints:
+- Read this file before each major execution.
+- Preserve R2/public JSON/detail fetch/prefetch optimizations.
+- Keep the restored old blog layout, but adjust the requested visitor UX details.
+
+Findings:
+- Old Git history (`b9b129c8`) had a Vercel-specific custom domain flow using Vercel project-domain APIs and `cname.vercel-dns.com`.
+- Cloudflare Workers supports custom domains through dashboard, Wrangler, and API for domains/zones in the Cloudflare account.
+- A Vercel-like customer-domain product on Cloudflare requires Cloudflare for SaaS custom hostnames and a SaaS-zone setup, not just the simple Worker custom-domain binding.
+
+Implemented:
+- Live blog name is now plain text, not a link.
+- Removed the visitor `Home` link from the live blog sidebar.
+- Removed the mail icon from `Subscribe by email`.
+- Live blog theme toggle now uses the same direct `ThemeToggle` presentation as the dashboard instead of the old wrapper shell.
+- Blog listing now shows a plain-text public `preview` derived from excerpt or post content.
+- Preview is clamped to 3 lines with ellipsis and server-truncated with `...` for very long text.
+- Public post metadata now includes `preview` and `schemaVersion`.
+- Existing stale R2 `public/posts.json` artifacts are detected and refreshed if they do not include the preview schema.
+- New Post button no longer imports or renders an icon.
+- Settings Deployment copy now explains Cloudflare custom domains versus the old Vercel one-click/API flow and links to Cloudflare for SaaS domain docs.
+
+Verification:
+- `cd backend && npm run typecheck` passed.
+- `npm run build` passed.
+- Local Worker smoke checked `/blog`, `/public/posts.json`, `/public/posts/smoke-test-post.json`, and `/api/hit`.
+- `/public/posts.json` returned `schemaVersion: 2` and a `preview` field.

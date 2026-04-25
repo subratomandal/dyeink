@@ -15,6 +15,7 @@ export interface Post {
 
 export type PublicPost = Omit<Post, 'content'> & {
     content?: string
+    preview?: string
 }
 
 export interface CreatePostInput {
