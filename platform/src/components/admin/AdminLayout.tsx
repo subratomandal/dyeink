@@ -213,21 +213,21 @@ export default function AdminLayout() {
                         left: 0 !important;
                         right: 0 !important;
                         width: 100% !important;
-                        height: calc(70px + env(safe-area-inset-bottom)) !important;
+                        height: calc(62px + env(safe-area-inset-bottom)) !important;
                         flex-direction: row !important;
                         align-items: center !important;
                         border-right: 0 !important;
                         border-top: 1px solid hsl(var(--border)) !important;
                         overflow-x: hidden !important;
                         overflow-y: hidden !important;
-                        padding: 0 max(0.35rem, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0.35rem, env(safe-area-inset-left)) !important;
+                        padding: 0 max(0.45rem, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0.45rem, env(safe-area-inset-left)) !important;
                     }
                     aside > div:first-child,
                     aside [data-section-label] { display: none !important; }
                     aside .px-5,
                     aside .pb-6 {
-                        padding-left: 0.35rem !important;
-                        padding-right: 0.35rem !important;
+                        padding-left: 0 !important;
+                        padding-right: 0 !important;
                         padding-bottom: 0 !important;
                     }
                     aside nav {
@@ -236,7 +236,7 @@ export default function AdminLayout() {
                         flex-direction: row !important;
                         align-items: center;
                         justify-content: space-evenly;
-                        gap: 0.2rem !important;
+                        gap: 0 !important;
                         padding: 0 !important;
                     }
                     aside nav a span,
@@ -244,18 +244,23 @@ export default function AdminLayout() {
                     aside [data-greeting] { display: none !important; }
                     aside nav a, aside button {
                         justify-content: center;
-                        width: 42px !important;
-                        height: 42px !important;
+                        width: 38px !important;
+                        height: 38px !important;
                         padding: 0 !important;
                         border-radius: 9999px;
                         margin: 0 auto;
                     }
+                    aside nav a svg,
+                    aside button svg {
+                        width: 1.05rem !important;
+                        height: 1.05rem !important;
+                    }
                     aside > div:last-child {
-                        flex: 0 0 42px !important;
+                        flex: 0 0 38px !important;
                         padding: 0 !important;
                     }
                     aside .new-post-btn {
-                        flex: 0 0 42px !important;
+                        flex: 0 0 38px !important;
                         padding: 0 !important;
                     }
                     .admin-main {
@@ -263,15 +268,15 @@ export default function AdminLayout() {
                         height: 100dvh !important;
                     }
                     .admin-scroll {
-                        padding-bottom: calc(82px + env(safe-area-inset-bottom)) !important;
+                        padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
                     }
                     .admin-content {
-                        padding: 4.5rem 1rem 2rem !important;
+                        padding: 4.15rem 0.9rem 1.75rem !important;
                         max-width: 100% !important;
                     }
                     .admin-main > .absolute.right-6.top-6 {
-                        top: 1rem !important;
-                        right: 1rem !important;
+                        top: 0.85rem !important;
+                        right: 0.85rem !important;
                     }
                 }
             `}</style>

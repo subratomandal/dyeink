@@ -172,7 +172,7 @@ type ChartPoint = {
 function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
     const width = 1080
     const height = 390
-    const padding = { top: 46, right: 98, bottom: 54, left: 62 }
+    const padding = { top: 28, right: 118, bottom: 62, left: 74 }
     const innerWidth = width - padding.left - padding.right
     const innerHeight = height - padding.top - padding.bottom
     const points = data.map((point, index) => ({
@@ -236,19 +236,11 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                 </linearGradient>
             </defs>
 
-            <g transform={`translate(${padding.left} 16)`}>
-                <text fill="hsl(var(--foreground))" fontSize="14" fontWeight="700" letterSpacing="0.02em">
-                    Views and shares
-                </text>
-                <text x="0" y="22" fill="hsl(var(--muted-foreground))" fontSize="12">
-                    Daily performance
-                </text>
-            </g>
-            <g transform={`translate(${width - padding.right - 196} 20)`}>
-                <circle cx="5" cy="5" r="4" fill="hsl(var(--foreground))" />
-                <text x="16" y="9" fill="hsl(var(--muted-foreground))" fontSize="12">Views</text>
-                <line x1="76" x2="92" y1="5" y2="5" stroke="#d6a04f" strokeWidth="2.4" strokeLinecap="round" />
-                <text x="102" y="9" fill="hsl(var(--muted-foreground))" fontSize="12">Shares</text>
+            <g transform={`translate(${width - padding.right - 208} 12)`}>
+                <circle cx="7" cy="7" r="6" fill="hsl(var(--foreground))" />
+                <text x="22" y="12" fill="hsl(var(--muted-foreground))" fontSize="16" fontWeight="700">Views</text>
+                <line x1="96" x2="122" y1="7" y2="7" stroke="#d6a04f" strokeWidth="5" strokeLinecap="round" />
+                <text x="136" y="12" fill="hsl(var(--muted-foreground))" fontSize="16" fontWeight="700">Shares</text>
             </g>
 
             {yTicks.map((tick) => (
@@ -259,15 +251,17 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                         y1={yScale(tick)}
                         y2={yScale(tick)}
                         stroke="hsl(var(--border))"
-                        strokeDasharray={tick === 0 ? undefined : '3 8'}
-                        strokeOpacity={tick === 0 ? 0.9 : 0.5}
+                        strokeDasharray={tick === 0 ? undefined : '5 10'}
+                        strokeWidth={tick === 0 ? 2.4 : 1.8}
+                        strokeOpacity={tick === 0 ? 0.95 : 0.7}
                     />
                     <text
-                        x={padding.left - 14}
-                        y={yScale(tick) + 4}
+                        x={padding.left - 18}
+                        y={yScale(tick) + 6}
                         textAnchor="end"
                         fill="hsl(var(--muted-foreground))"
-                        fontSize="11"
+                        fontSize="16"
+                        fontWeight="700"
                     >
                         {formatAxisValue(tick)}
                     </text>
@@ -280,7 +274,7 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                     d={viewsPath}
                     fill="none"
                     stroke="url(#dash_views_line)"
-                    strokeWidth="3.8"
+                    strokeWidth="6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                 />
@@ -290,7 +284,7 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                     d={sharesPath}
                     fill="none"
                     stroke="#d6a04f"
-                    strokeWidth="2.8"
+                    strokeWidth="5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                 />
@@ -300,16 +294,16 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                 const showLabel = index === 0 || index === points.length - 1 || index % labelStep === 0
                 return (
                     <g key={`${point.date}-${index}`}>
-                        <circle cx={xScale(point.index)} cy={yScale(point.views)} r="4.2" fill="hsl(var(--foreground))">
+                        <circle cx={xScale(point.index)} cy={yScale(point.views)} r="7" fill="hsl(var(--foreground))">
                             <title>{`${point.label}: ${point.views} views, ${point.shares} shares`}</title>
                         </circle>
                         <circle
                             cx={xScale(point.index)}
                             cy={yScale(point.shares)}
-                            r="3.3"
+                            r="5.8"
                             fill="#d6a04f"
                             stroke="hsl(var(--background))"
-                            strokeWidth="1.8"
+                            strokeWidth="2.4"
                         />
                         {showLabel ? (
                             <text
@@ -317,7 +311,8 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                                 y={height - 18}
                                 textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
                                 fill="hsl(var(--muted-foreground))"
-                                fontSize="11"
+                                fontSize="15"
+                                fontWeight="700"
                             >
                                 {point.label}
                             </text>
@@ -329,26 +324,28 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
             {lastPoint ? (
                 <>
                     <g transform={`translate(${width - padding.right + 12} ${viewsLabelY})`}>
-                        <text fill="hsl(var(--foreground))" fontSize="12" fontWeight="700">
+                        <text fill="hsl(var(--foreground))" fontSize="16" fontWeight="800">
                             {formatAxisValue(lastPoint.views)}
                         </text>
                         <text
-                            y="16"
+                            y="20"
                             fill="hsl(var(--muted-foreground))"
-                            fontSize="10"
+                            fontSize="13"
+                            fontWeight="700"
                             letterSpacing="0.04em"
                         >
                             views {formatDelta(viewsDelta)}
                         </text>
                     </g>
                     <g transform={`translate(${width - padding.right + 12} ${sharesLabelY})`}>
-                        <text fill="#d6a04f" fontSize="12" fontWeight="700">
+                        <text fill="#d6a04f" fontSize="16" fontWeight="800">
                             {formatAxisValue(lastPoint.shares)}
                         </text>
                         <text
-                            y="16"
+                            y="20"
                             fill="hsl(var(--muted-foreground))"
-                            fontSize="10"
+                            fontSize="13"
+                            fontWeight="700"
                             letterSpacing="0.04em"
                         >
                             shares {formatDelta(sharesDelta)}

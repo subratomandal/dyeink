@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { prefetchOnIntent } from '@/lib/prefetch'
 
 export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void }) {
@@ -18,7 +19,7 @@ export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void 
                 className="magic-button relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold text-white shadow-[0_0_10px_rgba(168,85,247,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
             >
                 <span className="magic-text magic-text-full">New Post</span>
-                <span className="magic-text magic-text-short" aria-hidden="true">New</span>
+                <Plus className="magic-plus hidden h-4 w-4" aria-hidden="true" />
             </Link>
 
             <style>{`
@@ -65,7 +66,7 @@ export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void 
                     letter-spacing: 0.02em;
                     transition: color 0.3s ease;
                 }
-                .magic-text-short {
+                .magic-plus {
                     display: none;
                 }
                 .magic-button:hover .magic-text {
@@ -75,21 +76,23 @@ export default function NewPostButton({ onPrefetch }: { onPrefetch?: () => void 
                 }
                 @media (max-width: 640px) {
                     .new-post-btn {
-                        flex: 0 0 42px !important;
+                        flex: 0 0 38px !important;
                         padding: 0 !important;
                     }
                     .new-post-btn .magic-button {
-                        width: 42px !important;
-                        height: 42px !important;
+                        width: 38px !important;
+                        height: 38px !important;
                         padding: 0 !important;
+                        box-shadow: none !important;
                     }
                     .new-post-btn .magic-text-full {
                         display: none !important;
                     }
-                    .new-post-btn .magic-text-short {
-                        display: inline !important;
-                        font-size: 0.62rem;
-                        letter-spacing: 0;
+                    .new-post-btn .magic-plus {
+                        display: block !important;
+                        color: hsl(var(--foreground));
+                        position: relative;
+                        z-index: 10;
                     }
                 }
                 @keyframes magic-rotate {
