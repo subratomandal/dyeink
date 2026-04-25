@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { prefetchOnIntent, scheduleIdlePrefetch } from '@/lib/prefetch'
 import { postService } from '@/services/postService'
 import { settingsService } from '@/services/settingsService'
+import { getPublicBlogUrl } from '@/lib/publicBlogUrl'
 
 function SidebarLink({
     to,
@@ -33,22 +34,45 @@ function SidebarLink({
         if (onPrefetch) prefetchOnIntent(onPrefetch)
     }
 
+    const className = cn(
+        'flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-normal transition-colors',
+        active
+            ? 'bg-accent text-foreground font-medium'
+            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+    )
+
+    const content = (
+        <>
+            <Icon className="h-5 w-5 shrink-0" />
+            <span>{label}</span>
+        </>
+    )
+
+    if (external) {
+        return (
+            <a
+                href={to}
+                target="_blank"
+                rel="noopener noreferrer"
+                onMouseEnter={handlePrefetch}
+                onFocus={handlePrefetch}
+                onTouchStart={handlePrefetch}
+                className={className}
+            >
+                {content}
+            </a>
+        )
+    }
+
     return (
         <Link
             to={to}
-            target={external ? '_blank' : undefined}
             onMouseEnter={handlePrefetch}
             onFocus={handlePrefetch}
             onTouchStart={handlePrefetch}
-            className={cn(
-                'flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-normal transition-colors',
-                active
-                    ? 'bg-accent text-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-            )}
+            className={className}
         >
-            <Icon className="h-5 w-5 shrink-0" />
-            <span>{label}</span>
+            {content}
         </Link>
     )
 }
@@ -93,6 +117,7 @@ export default function AdminLayout() {
     const location = useLocation()
     const { settings, fetchSettings } = useAdminStore()
     const greetingName = settings?.siteName || name || 'Admin'
+    const liveBlogUrl = getPublicBlogUrl(settings)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
 
     useEffect(() => {
@@ -188,7 +213,7 @@ export default function AdminLayout() {
                         active={isActive('/admin/settings')}
                         onPrefetch={prefetchSettings}
                     />
-                    <SidebarLink to="/blog" icon={Globe} label="Live ↗" external onPrefetch={prefetchLiveBlog} />
+                    <SidebarLink to={liveBlogUrl} icon={Globe} label="Live ↗" external onPrefetch={prefetchLiveBlog} />
                 </nav>
 
                 <div className="p-5">
@@ -331,6 +356,81 @@ export default function AdminLayout() {
                     .admin-content {
                         padding: 4.15rem 0.9rem 1.75rem !important;
                         max-width: 100% !important;
+                        font-size: 0.86rem !important;
+                        line-height: 1.45 !important;
+                    }
+                    .admin-content :where(h1) {
+                        font-size: clamp(1.35rem, 6.2vw, 1.75rem) !important;
+                        line-height: 1.08 !important;
+                        letter-spacing: -0.04em !important;
+                    }
+                    .admin-content :where(h2) {
+                        font-size: 1rem !important;
+                        line-height: 1.16 !important;
+                        letter-spacing: -0.025em !important;
+                    }
+                    .admin-content :where(h3) {
+                        font-size: 0.92rem !important;
+                        line-height: 1.2 !important;
+                    }
+                    .admin-content :where(p, label, li, td, th, time, input, textarea, select) {
+                        font-size: 0.82rem !important;
+                        line-height: 1.38 !important;
+                    }
+                    .admin-content :where(button, a.inline-flex, a[role="button"]) {
+                        min-height: 34px !important;
+                        height: 34px !important;
+                        padding: 0 0.72rem !important;
+                        border-radius: 0.65rem !important;
+                        font-size: 0.76rem !important;
+                        line-height: 1 !important;
+                    }
+                    .admin-content :where(input, select) {
+                        min-height: 36px !important;
+                        height: 36px !important;
+                        padding-block: 0.38rem !important;
+                    }
+                    .admin-content :where(textarea) {
+                        min-height: 76px !important;
+                        padding-block: 0.55rem !important;
+                    }
+                    .admin-content :where(button svg, a.inline-flex svg, .post-actions svg, .editor-toolbar-scroll svg, .editor-nav-actions svg) {
+                        width: 0.95rem !important;
+                        height: 0.95rem !important;
+                    }
+                    .admin-content .post-actions :where(button, a.inline-flex) {
+                        width: 34px !important;
+                        min-width: 34px !important;
+                        padding: 0 !important;
+                    }
+                    .admin-content :where(.editor-nav-actions button, .editor-toolbar-scroll button) {
+                        width: 32px !important;
+                        height: 32px !important;
+                        min-height: 32px !important;
+                        padding: 0 !important;
+                    }
+                    .admin-content :where(.editor-title-editable) {
+                        font-size: clamp(1.45rem, 7vw, 2rem) !important;
+                        line-height: 1.08 !important;
+                    }
+                    .admin-content .editor-title-editable:empty::before {
+                        font-size: clamp(1.45rem, 7vw, 2rem) !important;
+                    }
+                    .admin-content :where(.editor-content-editable, .editor-markdown-source, .editor-preview) {
+                        font-size: 0.9rem !important;
+                        line-height: 1.55 !important;
+                    }
+                    .admin-content :where(.editor-preview h1, .editor-content-editable h1) {
+                        font-size: 1.65em !important;
+                    }
+                    .admin-content :where(.editor-preview h2, .editor-content-editable h2) {
+                        font-size: 1.35em !important;
+                    }
+                    .admin-content :where(.editor-preview h3, .editor-content-editable h3) {
+                        font-size: 1.12em !important;
+                    }
+                    .admin-content svg text {
+                        font-size: 10px !important;
                     }
                     .admin-main > .absolute.right-6.top-6 {
                         top: 0.85rem !important;

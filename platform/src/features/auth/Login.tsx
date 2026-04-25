@@ -1,7 +1,7 @@
 import { useState, FormEvent, useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Lock, Loader2 } from 'lucide-react'
-import LightRays from '@/components/common/animations/LightRays'
+import Dither from '@/components/common/animations/Dither'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -60,21 +60,23 @@ export default function Login() {
 
     return (
         <div className="relative flex min-h-svh items-center justify-center overflow-hidden px-4 py-8 sm:p-8">
-            <div className="pointer-events-none absolute inset-0 z-0">
-                <LightRays
-                    raysOrigin="top-center"
-                    raysColor="#00ffff"
-                    raysSpeed={2.0}
-                    lightSpread={5.0}
-                    rayLength={10.0}
-                    followMouse
-                    mouseInfluence={0.2}
-                    noiseAmount={0.1}
-                    distortion={0.1}
+            <div className="pointer-events-none fixed inset-0 z-0 opacity-70">
+                <Dither
+                    waveColor={[0.5, 0.5, 0.5]}
+                    disableAnimation={false}
+                    enableMouseInteraction
+                    mouseRadius={0.3}
+                    colorNum={4}
+                    pixelSize={2}
+                    waveAmplitude={0.3}
+                    waveFrequency={3}
+                    waveSpeed={0.05}
                 />
             </div>
+            <div className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_44%,transparent_0%,color-mix(in_srgb,var(--background)_48%,transparent)_58%,var(--background)_100%)]" />
+            <div className="pointer-events-none fixed inset-0 z-[2] bg-background/20 backdrop-blur-[1px]" />
 
-            <Card className="relative z-10 w-full max-w-sm animate-fade-in">
+            <Card className="relative z-10 w-full max-w-sm animate-fade-in border-border/70 bg-card/88 shadow-2xl shadow-black/10 backdrop-blur-xl">
                 <CardContent className="p-6 sm:p-10">
                     <div className="mb-8 text-center">
                         <img

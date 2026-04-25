@@ -971,6 +971,41 @@ async function getSettingsPayload(db: D1Database) {
   return serializeSettings(row)
 }
 
+async function getPublicDomainRoutingSettings(env: Bindings) {
+  await ensureSchema(env.DB)
+  return env.DB.prepare('SELECT custom_domain, domain_status FROM site_settings WHERE id = 1').first<{
+    custom_domain: string | null
+    domain_status: string | null
+  }>()
+}
+
+function requestHostname(c: AppCtx) {
+  return new URL(c.req.url).hostname.toLowerCase().replace(/\.$/, '')
+}
+
+function normalizeStoredHostname(hostname: string | null | undefined) {
+  return hostname?.toLowerCase().replace(/^https?:\/\//, '').split('/')[0].replace(/\.$/, '') || ''
+}
+
+function isLocalHostname(hostname: string) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
+}
+
+function isStaticAssetPath(pathname: string) {
+  return (
+    pathname.startsWith('/assets/') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/Di.png' ||
+    pathname === '/ddd.png'
+  )
+}
+
+function isConnectedDomainStatus(status: string | null | undefined) {
+  return status === 'verified' || status === 'active'
+}
+
 function isEmailServiceReady(env: Bindings) {
   return !!env.EMAIL && !!env.EMAIL_FROM && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.EMAIL_FROM)
 }
@@ -1625,6 +1660,32 @@ app.get('/img/:key', async (c) => {
 // ==========================================================================
 
 app.all('*', async (c) => {
+  const url = new URL(c.req.url)
+
+  if (!isStaticAssetPath(url.pathname)) {
+    const routingSettings = await getPublicDomainRoutingSettings(c.env).catch(() => null)
+    const customDomain = normalizeStoredHostname(routingSettings?.custom_domain)
+    const host = requestHostname(c)
+
+    if (customDomain && isConnectedDomainStatus(routingSettings?.domain_status)) {
+      const isCustomDomain = host === customDomain
+      const isPublicBlogPath = url.pathname === '/blog' || url.pathname.startsWith('/blog/')
+
+      if (isCustomDomain && !isPublicBlogPath) {
+        url.pathname = '/blog'
+        url.search = ''
+        return c.redirect(url.toString(), 302)
+      }
+
+      if (!isCustomDomain && !isLocalHostname(host) && isPublicBlogPath) {
+        url.hostname = customDomain
+        url.protocol = 'https:'
+        url.port = ''
+        return c.redirect(url.toString(), 302)
+      }
+    }
+  }
+
   return c.env.ASSETS.fetch(c.req.raw)
 })
 

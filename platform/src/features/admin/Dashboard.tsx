@@ -8,6 +8,7 @@ import { useAdminStore } from '@/stores/adminStore'
 import DashboardSkeleton from '@/components/admin/skeletons/DashboardSkeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDateKey, formatDateShort } from '@/lib/date'
+import { getPublicBlogUrl } from '@/lib/publicBlogUrl'
 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
@@ -21,7 +22,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function Dashboard() {
-    const { posts, postsLoading, stats, statsLoading } = useAdminStore()
+    const { posts, postsLoading, stats, statsLoading, settings } = useAdminStore()
     const [ready, setReady] = useState(false)
 
     useEffect(() => {
@@ -58,6 +59,9 @@ export default function Dashboard() {
     }, [stats])
 
     const showLoader = (postsLoading && !posts) || (statsLoading && !stats)
+    const latestPostUrl = dashboardStats.latestPost
+        ? getPublicBlogUrl(settings, dashboardStats.latestPost.slug)
+        : ''
 
     if (showLoader) return <DashboardSkeleton />
 
@@ -94,8 +98,8 @@ export default function Dashboard() {
             <div className="dashboard-latest-section mb-8">
                 <h2 className="dashboard-latest-title mb-5 text-lg font-semibold text-muted-foreground sm:text-xl">Latest Post</h2>
                 {dashboardStats.latestPost ? (
-                    <Link
-                        to={`/blog/${dashboardStats.latestPost.slug}`}
+                    <a
+                        href={latestPostUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="block no-underline"
@@ -115,7 +119,7 @@ export default function Dashboard() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </Link>
+                    </a>
                 ) : (
                     <Card className="dashboard-latest-card border-border bg-transparent shadow-none">
                         <CardContent className="dashboard-latest-content p-6">

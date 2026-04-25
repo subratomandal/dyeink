@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Share2 } from 'lucide-react'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import SubscribeModal from '@/components/common/ui/SubscribeModal'
+import Skeleton from '@/components/common/ui/Skeleton'
 import { useToast } from '@/components/common/feedback/Toast'
 import { useCodeCopy } from '@/hooks/useCodeCopy'
 import { postService } from '@/services/postService'
@@ -11,6 +12,7 @@ import { statsService } from '@/services/statsService'
 import type { Post, PublicPost } from '@/types'
 import { formatDateShort } from '@/lib/date'
 import { renderGitHubContent, renderMermaidDiagrams } from '@/lib/githubMarkdown'
+import { getPublicBlogOrigin } from '@/lib/publicBlogUrl'
 import { prefetchOnIntent, scheduleIdlePrefetch } from '@/lib/prefetch'
 
 const XIcon = ({ size = 20 }: { size?: number }) => (
@@ -133,7 +135,7 @@ export default function Blog() {
     }
 
     const handleShare = async (post: Pick<Post, 'id' | 'slug' | 'title'>) => {
-        const permalink = `${window.location.origin}/blog/${post.slug}`
+        const permalink = `${getPublicBlogOrigin(settings) || window.location.origin}/blog/${post.slug}`
         try {
             if (navigator.share) {
                 await navigator.share({ title: post.title, url: permalink })
@@ -210,7 +212,15 @@ export default function Blog() {
 
                 <main ref={contentRef} className="blog-main" style={{ paddingTop: '0.4rem' }}>
                     {loading || activePostLoading ? (
-                        <div style={{ padding: '2rem 0', color: 'var(--text-muted)' }}>Loading...</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.25rem 0 2rem' }}>
+                            <Skeleton style={{ height: '28px', width: slug ? '62%' : '48%', borderRadius: '999px' }} />
+                            <Skeleton style={{ height: '12px', width: '28%', borderRadius: '999px' }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', paddingTop: '0.4rem' }}>
+                                <Skeleton style={{ height: '12px', width: '100%', borderRadius: '999px' }} />
+                                <Skeleton style={{ height: '12px', width: '88%', borderRadius: '999px' }} />
+                                <Skeleton style={{ height: '12px', width: '72%', borderRadius: '999px' }} />
+                            </div>
+                        </div>
                     ) : isEmpty ? (
                         <div style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>
                             {searchTerm ? 'No posts match that search.' : 'No posts published yet.'}

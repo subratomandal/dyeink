@@ -4,32 +4,38 @@ export default function DashboardSkeleton() {
     return (
         <div className="dashboard-page animate-fade-in pb-16">
             <div className="dashboard-header mb-8 flex items-center justify-between">
-                <Skeleton className="h-10 w-52 rounded-lg" />
+                <Skeleton className="h-8 w-44 rounded-full" />
             </div>
 
             <section className="dashboard-section mb-12">
-                <Skeleton className="dashboard-section-title mb-6 h-7 w-28 rounded-lg" />
+                <Skeleton className="dashboard-section-title mb-6 h-5 w-24 rounded-full" />
 
                 <div className="mb-8 flex gap-8 dashboard-stats-row">
                     {[1, 2, 3].map((i) => (
-                        <div key={i} className="dashboard-stat flex-1 py-6">
-                            <Skeleton className="mb-2 h-4 w-24 rounded-full" />
-                            <Skeleton className="h-9 w-20 rounded-lg" />
+                        <div key={i} className="dashboard-stat flex-1 py-4">
+                            <Skeleton className="mb-3 h-3 w-20 rounded-full" />
+                            <Skeleton className="h-7 w-14 rounded-full" />
                         </div>
                     ))}
                 </div>
 
-                <div className="dashboard-chart-skeleton overflow-hidden rounded-xl border bg-card p-4 shadow sm:p-6">
-                    <Skeleton className="dashboard-chart-skeleton-fill h-[300px] w-full rounded-lg" />
+                <div className="dashboard-chart-skeleton space-y-4 overflow-hidden rounded-xl bg-transparent py-2">
+                    <Skeleton className="h-3 w-20 rounded-full" />
+                    <div className="dashboard-chart-skeleton-fill flex h-[300px] flex-col justify-end gap-6">
+                        <Skeleton className="h-px w-full rounded-none" />
+                        <Skeleton className="h-px w-full rounded-none" />
+                        <Skeleton className="h-px w-full rounded-none" />
+                        <Skeleton className="h-24 w-full rounded-2xl" />
+                    </div>
                 </div>
             </section>
 
-            <div className="dashboard-latest-section mb-8 rounded-xl border bg-card p-6 shadow">
-                <Skeleton className="dashboard-latest-title mb-5 h-7 w-32 rounded-lg" />
-                <Skeleton className="dashboard-latest-heading mb-4 h-8 w-64 max-w-full rounded-lg" />
+            <div className="dashboard-latest-section mb-8">
+                <Skeleton className="dashboard-latest-title mb-5 h-5 w-28 rounded-full" />
+                <Skeleton className="dashboard-latest-heading mb-4 h-7 w-64 max-w-full rounded-full" />
                 <div className="dashboard-latest-meta flex items-center justify-between">
-                    <Skeleton className="h-4 w-24 rounded-full" />
-                    <Skeleton className="h-4 w-20 rounded-full" />
+                    <Skeleton className="h-3 w-20 rounded-full" />
+                    <Skeleton className="h-3 w-16 rounded-full" />
                 </div>
             </div>
 
@@ -41,7 +47,7 @@ export default function DashboardSkeleton() {
                     .dashboard-header {
                         margin-bottom: 1.05rem !important;
                     }
-                    .dashboard-header .skeleton-shimmer {
+                    .dashboard-header .skeleton-minimal {
                         width: 10.5rem !important;
                     }
                     .dashboard-section {
@@ -61,12 +67,12 @@ export default function DashboardSkeleton() {
                         min-width: 0;
                         padding: 0.35rem 0 !important;
                     }
-                    .dashboard-stat .skeleton-shimmer:first-child {
+                    .dashboard-stat .skeleton-minimal:first-child {
                         width: 100% !important;
                         max-width: 4.8rem !important;
                         margin-bottom: 0.45rem !important;
                     }
-                    .dashboard-stat .skeleton-shimmer:last-child {
+                    .dashboard-stat .skeleton-minimal:last-child {
                         width: 70% !important;
                         max-width: 4.6rem !important;
                     }

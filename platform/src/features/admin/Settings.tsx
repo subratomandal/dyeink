@@ -97,8 +97,6 @@ export default function Settings() {
                 dribbbleLink: dribbbleLink || null,
                 huggingfaceLink: huggingfaceLink || null,
                 leetcodeLink: leetcodeLink || null,
-                customDomain: customDomain || null,
-                domainStatus,
             })
             if (updated) {
                 updateSettingsInCache(updated)
