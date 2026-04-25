@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 import { prefetchOnIntent, scheduleIdlePrefetch } from '@/lib/prefetch'
 import { postService } from '@/services/postService'
 import { settingsService } from '@/services/settingsService'
-import { getPublicBlogUrl } from '@/lib/publicBlogUrl'
 
 function SidebarLink({
     to,
@@ -117,7 +116,6 @@ export default function AdminLayout() {
     const location = useLocation()
     const { settings, fetchSettings } = useAdminStore()
     const greetingName = settings?.siteName || name || 'Admin'
-    const liveBlogUrl = getPublicBlogUrl(settings)
     const [isLoggingOut, setIsLoggingOut] = useState(false)
 
     useEffect(() => {
@@ -213,7 +211,7 @@ export default function AdminLayout() {
                         active={isActive('/admin/settings')}
                         onPrefetch={prefetchSettings}
                     />
-                    <SidebarLink to={liveBlogUrl} icon={Globe} label="Live ↗" external onPrefetch={prefetchLiveBlog} />
+                    <SidebarLink to="/blog" icon={Globe} label="Live ↗" external onPrefetch={prefetchLiveBlog} />
                 </nav>
 
                 <div className="p-5">
@@ -377,13 +375,25 @@ export default function AdminLayout() {
                         font-size: 0.82rem !important;
                         line-height: 1.38 !important;
                     }
-                    .admin-content :where(button, a.inline-flex, a[role="button"]) {
+                    .admin-content :where(button:not([data-slot="switch"]), a.inline-flex, a[role="button"]) {
                         min-height: 34px !important;
                         height: 34px !important;
                         padding: 0 0.72rem !important;
                         border-radius: 0.65rem !important;
                         font-size: 0.76rem !important;
                         line-height: 1 !important;
+                    }
+                    .admin-content [data-slot="switch"] {
+                        width: 2.25rem !important;
+                        min-width: 2.25rem !important;
+                        height: 1.25rem !important;
+                        min-height: 1.25rem !important;
+                        padding: 0 !important;
+                        border-radius: 9999px !important;
+                    }
+                    .admin-content [data-slot="switch-thumb"] {
+                        width: 1rem !important;
+                        height: 1rem !important;
                     }
                     .admin-content :where(input, select) {
                         min-height: 36px !important;

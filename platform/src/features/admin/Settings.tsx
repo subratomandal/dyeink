@@ -264,8 +264,8 @@ export default function Settings() {
                     </div>
 
                     <div className="space-y-3">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0">
                                 <h3 className="text-base font-semibold">Newsletter</h3>
                                 <p className="mt-1 text-sm text-muted-foreground">
                                     Allow visitors to subscribe to email updates.
@@ -274,6 +274,7 @@ export default function Settings() {
                             <Switch
                                 checked={newsletterEnabled}
                                 onCheckedChange={setNewsletterEnabled}
+                                aria-label="Toggle newsletter subscriptions"
                             />
                         </div>
                     </div>

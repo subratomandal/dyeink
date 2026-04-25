@@ -8,7 +8,6 @@ import { useAdminStore } from '@/stores/adminStore'
 import DashboardSkeleton from '@/components/admin/skeletons/DashboardSkeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDateKey, formatDateShort } from '@/lib/date'
-import { getPublicBlogUrl } from '@/lib/publicBlogUrl'
 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
@@ -22,7 +21,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function Dashboard() {
-    const { posts, postsLoading, stats, statsLoading, settings } = useAdminStore()
+    const { posts, postsLoading, stats, statsLoading } = useAdminStore()
     const [ready, setReady] = useState(false)
 
     useEffect(() => {
@@ -60,7 +59,7 @@ export default function Dashboard() {
 
     const showLoader = (postsLoading && !posts) || (statsLoading && !stats)
     const latestPostUrl = dashboardStats.latestPost
-        ? getPublicBlogUrl(settings, dashboardStats.latestPost.slug)
+        ? `/blog/${encodeURIComponent(dashboardStats.latestPost.slug)}`
         : ''
 
     if (showLoader) return <DashboardSkeleton />

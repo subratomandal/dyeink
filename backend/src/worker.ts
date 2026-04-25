@@ -66,6 +66,8 @@ app.use('/api/*', (c, next) => {
   })(c, next)
 })
 
+app.use('*', enforceCustomDomainBlogBoundary)
+
 // ---------- Auth middleware ----------
 
 type AppCtx = Context<{ Bindings: Bindings; Variables: Variables }>
@@ -991,6 +993,14 @@ function isLocalHostname(hostname: string) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
 }
 
+function isWorkersPreviewHostname(hostname: string) {
+  return hostname.endsWith('.workers.dev') || hostname.endsWith('.pages.dev')
+}
+
+function isPublicBlogPath(pathname: string) {
+  return pathname === '/blog' || pathname.startsWith('/blog/')
+}
+
 function isStaticAssetPath(pathname: string) {
   return (
     pathname.startsWith('/assets/') ||
@@ -1002,6 +1012,52 @@ function isStaticAssetPath(pathname: string) {
   )
 }
 
+function isCustomDomainPublicSupportPath(c: AppCtx, pathname: string) {
+  const method = c.req.method.toUpperCase()
+
+  if (
+    isStaticAssetPath(pathname) ||
+    pathname.startsWith('/public/') ||
+    pathname.startsWith('/img/')
+  ) {
+    return true
+  }
+
+  if (method === 'OPTIONS' && pathname.startsWith('/api/')) return true
+  if (method === 'GET' && pathname === '/api/settings') return true
+  if (method === 'GET' && pathname === '/api/posts/public') return true
+  if (method === 'GET' && pathname.startsWith('/api/posts/slug/')) return true
+  if ((method === 'GET' || method === 'POST') && pathname === '/api/hit') return true
+  if (method === 'POST' && pathname === '/api/subscribe') return true
+  if ((method === 'GET' || method === 'POST') && pathname === '/api/unsubscribe') return true
+
+  return false
+}
+
+async function enforceCustomDomainBlogBoundary(c: AppCtx, next: Next) {
+  const host = requestHostname(c)
+  if (isLocalHostname(host) || isWorkersPreviewHostname(host)) return next()
+
+  const routingSettings = await getPublicDomainRoutingSettings(c.env).catch(() => null)
+  const customDomain = normalizeStoredHostname(routingSettings?.custom_domain)
+  if (!customDomain || host !== customDomain || !isConnectedDomainStatus(routingSettings?.domain_status)) {
+    return next()
+  }
+
+  const url = new URL(c.req.url)
+  if (isPublicBlogPath(url.pathname) || isCustomDomainPublicSupportPath(c, url.pathname)) {
+    return next()
+  }
+
+  if (url.pathname.startsWith('/api/')) {
+    return c.json({ error: 'Not found' }, 404)
+  }
+
+  url.pathname = '/blog'
+  url.search = ''
+  return c.redirect(url.toString(), 302)
+}
+
 function isConnectedDomainStatus(status: string | null | undefined) {
   return status === 'verified' || status === 'active'
 }
@@ -1011,9 +1067,11 @@ function isEmailServiceReady(env: Bindings) {
 }
 
 function getBaseUrl(c: AppCtx, settings?: SettingsRow | null) {
+  const customDomain = normalizeStoredHostname(settings?.custom_domain)
+  if (customDomain && isConnectedDomainStatus(settings?.domain_status)) return `https://${customDomain}`
+
   const configured = c.env.SITE_URL || c.env.FRONTEND_ORIGIN
   if (configured && configured !== '*') return configured.replace(/\/$/, '')
-  if (settings?.custom_domain) return `https://${settings.custom_domain}`
   return new URL(c.req.url).origin
 }
 
@@ -1669,18 +1727,11 @@ app.all('*', async (c) => {
 
     if (customDomain && isConnectedDomainStatus(routingSettings?.domain_status)) {
       const isCustomDomain = host === customDomain
-      const isPublicBlogPath = url.pathname === '/blog' || url.pathname.startsWith('/blog/')
+      const isPublicBlogRoute = isPublicBlogPath(url.pathname)
 
-      if (isCustomDomain && !isPublicBlogPath) {
+      if (isCustomDomain && !isPublicBlogRoute) {
         url.pathname = '/blog'
         url.search = ''
-        return c.redirect(url.toString(), 302)
-      }
-
-      if (!isCustomDomain && !isLocalHostname(host) && isPublicBlogPath) {
-        url.hostname = customDomain
-        url.protocol = 'https:'
-        url.port = ''
         return c.redirect(url.toString(), 302)
       }
     }
