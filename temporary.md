@@ -182,3 +182,25 @@ Verification:
 - `npm run build` passed.
 - Local Worker smoke checked `/blog`, `/public/posts.json`, `/public/posts/smoke-test-post.json`, and `/api/hit`.
 - `/public/posts.json` returned `schemaVersion: 2` and a `preview` field.
+
+## Follow-Up: GitHub Actions Worker Bundle Dependency Failure
+
+User build failure on 2026-04-25:
+- `platform` build finished Vite successfully.
+- `node ../scripts/bundle-worker.mjs` failed while bundling `backend/src/worker.ts`.
+- esbuild could not resolve `hono` and `hono/cors`.
+
+Cause:
+- The GitHub deploy workflow installed platform dependencies and ran the platform build before backend dependencies were installed.
+- The platform build is responsible for producing `platform/dist/_worker.js`, so it must have backend Worker dependencies available at bundle time.
+- The workflow also referenced `backend/package-lock.json`, but this repo does not have that file.
+
+Fix:
+- GitHub Actions now installs the root workspace once with `npm ci --legacy-peer-deps`, using the root `package-lock.json`.
+- The separate late backend install step was removed because the root workspace install already installs backend and platform dependencies.
+- `scripts/bundle-worker.mjs` now sets `absWorkingDir` to the repo root and explicitly allows module resolution from root, backend, and platform `node_modules`.
+
+Verification:
+- `npm ci --legacy-peer-deps --dry-run` passed.
+- `npm run build` passed.
+- `cd backend && npm run typecheck` passed.

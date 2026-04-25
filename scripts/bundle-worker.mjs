@@ -10,10 +10,17 @@ import { mkdirSync, existsSync, writeFileSync } from 'node:fs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..')
+const backendRoot = resolve(repoRoot, 'backend')
+const platformRoot = resolve(repoRoot, 'platform')
 const entry = resolve(repoRoot, 'backend/src/worker.ts')
 const outDir = resolve(repoRoot, 'platform/dist')
 const outFile = resolve(outDir, '_worker.js')
 const assetsIgnoreFile = resolve(outDir, '.assetsignore')
+const modulePaths = [
+    resolve(repoRoot, 'node_modules'),
+    resolve(backendRoot, 'node_modules'),
+    resolve(platformRoot, 'node_modules'),
+].filter(existsSync)
 
 if (!existsSync(outDir)) {
     mkdirSync(outDir, { recursive: true })
@@ -21,6 +28,8 @@ if (!existsSync(outDir)) {
 
 await build({
     entryPoints: [entry],
+    absWorkingDir: repoRoot,
+    nodePaths: modulePaths,
     bundle: true,
     format: 'esm',
     target: 'es2022',

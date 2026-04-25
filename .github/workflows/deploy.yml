@@ -32,21 +32,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: |
-            platform/package-lock.json
-            backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install platform deps
-        working-directory: platform
-        run: npm install --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
       - name: Build platform
         working-directory: platform
         run: npm run build
-
-      - name: Install backend deps
-        working-directory: backend
-        run: npm install
 
       - name: Ensure D1 database exists
         working-directory: backend
