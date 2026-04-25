@@ -39,6 +39,14 @@ export default function Settings() {
     const [dribbbleLink, setDribbbleLink] = useState('')
     const [huggingfaceLink, setHuggingfaceLink] = useState('')
     const [leetcodeLink, setLeetcodeLink] = useState('')
+    const [customDomain, setCustomDomain] = useState('')
+    const [domainStatus, setDomainStatus] = useState<
+        'pending' | 'verified' | 'active' | 'failed' | null
+    >(null)
+    const [domainMessage, setDomainMessage] = useState('')
+    const [domainInstructions, setDomainInstructions] = useState<string[]>([])
+    const [domainConnecting, setDomainConnecting] = useState(false)
+    const [domainDisconnecting, setDomainDisconnecting] = useState(false)
 
     // Change-password state
     const [currentPw, setCurrentPw] = useState('')
@@ -71,6 +79,8 @@ export default function Settings() {
         setDribbbleLink(settings.dribbbleLink || '')
         setHuggingfaceLink(settings.huggingfaceLink || '')
         setLeetcodeLink(settings.leetcodeLink || '')
+        setCustomDomain(settings.customDomain || '')
+        setDomainStatus(settings.domainStatus || null)
     }, [settings])
 
     const handleSave = async () => {
@@ -87,6 +97,8 @@ export default function Settings() {
                 dribbbleLink: dribbbleLink || null,
                 huggingfaceLink: huggingfaceLink || null,
                 leetcodeLink: leetcodeLink || null,
+                customDomain: customDomain || null,
+                domainStatus,
             })
             if (updated) {
                 updateSettingsInCache(updated)
@@ -102,6 +114,83 @@ export default function Settings() {
             setSaving(false)
         }
     }
+
+    const handleVerifyDomain = async () => {
+        if (!customDomain.trim()) {
+            addToast({ type: 'error', message: 'Enter a domain first.' })
+            return
+        }
+
+        setDomainConnecting(true)
+        setDomainMessage('')
+        setDomainInstructions([])
+        try {
+            const result = await settingsService.verifyDomain(customDomain)
+            if (!result.success) {
+                setDomainMessage(result.error || 'Failed to connect domain')
+                setDomainInstructions(result.instructions?.steps || [])
+                setDomainStatus(result.status || 'failed')
+                addToast({ type: 'error', message: result.error || 'Failed to connect domain' })
+                return
+            }
+
+            const nextStatus = result.status || (result.verified ? 'verified' : 'pending')
+            setDomainStatus(nextStatus)
+            setCustomDomain(result.hostname || customDomain)
+            setDomainMessage(result.message || 'Domain connected.')
+            if (result.settings) {
+                updateSettingsInCache(result.settings)
+            }
+            await fetchSettings(true)
+            addToast({
+                type: 'success',
+                message: result.message || 'Domain connected! SSL is being issued. This can take 5–20 minutes.',
+            })
+        } catch (err: any) {
+            setDomainStatus('failed')
+            setDomainMessage(err?.response?.data?.error || err.message || 'Failed to connect domain')
+            addToast({
+                type: 'error',
+                message: err?.response?.data?.error || err.message || 'Failed to connect domain',
+            })
+        } finally {
+            setDomainConnecting(false)
+        }
+    }
+
+    const handleDisconnectDomain = async () => {
+        setDomainDisconnecting(true)
+        setDomainMessage('')
+        setDomainInstructions([])
+        try {
+            const result = await settingsService.disconnectDomain()
+            setCustomDomain('')
+            setDomainStatus(null)
+            if (result.settings) {
+                updateSettingsInCache(result.settings)
+            }
+            await fetchSettings(true)
+            addToast({ type: 'success', message: 'Custom domain disconnected.' })
+        } catch (err: any) {
+            addToast({
+                type: 'error',
+                message: err?.response?.data?.error || err.message || 'Failed to disconnect domain',
+            })
+        } finally {
+            setDomainDisconnecting(false)
+        }
+    }
+
+    const domainStatusLabel =
+        domainStatus === 'verified'
+            ? 'Connected'
+            : domainStatus === 'active'
+              ? 'Active'
+              : domainStatus === 'pending'
+                ? 'Pending'
+                : domainStatus === 'failed'
+                  ? 'Failed'
+                  : 'Not connected'
 
     const handleChangePassword = async () => {
         if (nextPw !== confirmPw) {
@@ -188,6 +277,97 @@ export default function Settings() {
                                 checked={newsletterEnabled}
                                 onCheckedChange={setNewsletterEnabled}
                             />
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div>
+                            <h3 className="text-base font-semibold">Custom domain</h3>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Connect a Cloudflare-managed domain to this blog.
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-border bg-card/60 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                                <Input
+                                    id="custom-domain"
+                                    placeholder="blog.example.com"
+                                    value={customDomain}
+                                    onChange={(e) => {
+                                        const nextDomain = e.target.value
+                                        setCustomDomain(nextDomain)
+                                        setDomainStatus(
+                                            nextDomain.trim() === (settings?.customDomain || '')
+                                                ? settings?.domainStatus || null
+                                                : null,
+                                        )
+                                        setDomainMessage('')
+                                        setDomainInstructions([])
+                                    }}
+                                    className="h-11 sm:flex-1"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={handleVerifyDomain}
+                                    disabled={domainConnecting || !customDomain.trim()}
+                                    className="w-full sm:w-auto"
+                                >
+                                    {domainConnecting && <Spinner size={16} />}
+                                    {domainConnecting ? 'Connecting…' : 'Connect domain'}
+                                </Button>
+                            </div>
+
+                            <div className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <span className="font-medium text-foreground">{domainStatusLabel}</span>
+                                    {customDomain && (
+                                        <span className="ml-2 font-mono text-xs text-muted-foreground">
+                                            {customDomain}
+                                        </span>
+                                    )}
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Cloudflare creates the DNS record and SSL certificate when the zone is in your
+                                        account.
+                                    </p>
+                                </div>
+                                {settings?.customDomain && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={handleDisconnectDomain}
+                                        disabled={domainDisconnecting}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        {domainDisconnecting && <Spinner size={16} />}
+                                        {domainDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                                    </Button>
+                                )}
+                            </div>
+
+                            {domainMessage && (
+                                <p
+                                    className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+                                        domainStatus === 'failed'
+                                            ? 'bg-red-500/10 text-red-500'
+                                            : 'bg-muted text-muted-foreground'
+                                    }`}
+                                >
+                                    {domainMessage}
+                                </p>
+                            )}
+
+                            {domainInstructions.length > 0 && (
+                                <div className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                                    {domainInstructions.map((step, index) => (
+                                        <p key={step} className={index === 0 ? 'm-0' : 'mb-0 mt-2'}>
+                                            {index + 1}. {step}
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 

@@ -27,9 +27,13 @@ CREATE TABLE IF NOT EXISTS site_settings (
   dribbble_link TEXT,
   huggingface_link TEXT,
   leetcode_link TEXT,
+  custom_domain TEXT,
+  domain_status TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_custom_domain ON site_settings(custom_domain);
 
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY,

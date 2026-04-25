@@ -34,6 +34,13 @@ type Bindings = {
   EMAIL_FROM_NAME?: string
   R2_PUBLIC_URL?: string
   D1_HIT_ROLLUPS?: string
+  CLOUDFLARE_API_TOKEN?: string
+  CLOUDFLARE_ACCOUNT_ID?: string
+  CLOUDFLARE_ZONE_ID?: string
+  CLOUDFLARE_ZONE_NAME?: string
+  CLOUDFLARE_WORKER_NAME?: string
+  CLOUDFLARE_WORKER_ENVIRONMENT?: string
+  CUSTOM_DOMAIN_TARGET?: string
 }
 
 type Variables = {
@@ -233,6 +240,8 @@ const INIT_SCHEMA_STATEMENTS = [
   dribbble_link TEXT,
   huggingface_link TEXT,
   leetcode_link TEXT,
+  custom_domain TEXT,
+  domain_status TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );`,
@@ -282,14 +291,29 @@ const INIT_SCHEMA_STATEMENTS = [
 
 let schemaReady: Promise<void> | null = null
 
+async function ensureSettingsColumn(db: D1Database, name: string, definition: string) {
+  const { results } = await db.prepare('PRAGMA table_info(site_settings)').all<{ name: string }>()
+  if (results.some((column) => column.name === name)) return
+  await db.prepare(`ALTER TABLE site_settings ADD COLUMN ${definition}`).run()
+}
+
+async function runRuntimeMigrations(db: D1Database) {
+  await ensureSettingsColumn(db, 'custom_domain', 'custom_domain TEXT')
+  await ensureSettingsColumn(db, 'domain_status', 'domain_status TEXT')
+  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_custom_domain ON site_settings(custom_domain)').run()
+}
+
 function ensureSchema(db: D1Database): Promise<void> {
-  schemaReady ??= db.batch(INIT_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement))).then(
-    () => undefined,
-    (err) => {
-      schemaReady = null
-      throw err
-    },
-  )
+  schemaReady ??= db
+    .batch(INIT_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement)))
+    .then(() => runRuntimeMigrations(db))
+    .then(
+      () => undefined,
+      (err) => {
+        schemaReady = null
+        throw err
+      },
+    )
   return schemaReady
 }
 
@@ -710,6 +734,8 @@ interface SettingsRow {
   dribbble_link: string | null
   huggingface_link: string | null
   leetcode_link: string | null
+  custom_domain: string | null
+  domain_status: string | null
   created_at: number
   updated_at: number
 }
@@ -729,7 +755,215 @@ function serializeSettings(r: SettingsRow | null) {
     dribbbleLink: r.dribbble_link,
     huggingfaceLink: r.huggingface_link,
     leetcodeLink: r.leetcode_link,
+    customDomain: r.custom_domain,
+    domainStatus: r.domain_status,
   }
+}
+
+type DomainStatus = 'pending' | 'verified' | 'active' | 'failed'
+
+type CloudflareApiMessage = {
+  code?: number
+  message?: string
+}
+
+type CloudflareEnvelope<T> = {
+  success: boolean
+  result?: T
+  errors?: CloudflareApiMessage[]
+  messages?: CloudflareApiMessage[]
+}
+
+type CloudflareZone = {
+  id: string
+  name?: string
+}
+
+type CloudflareWorkerDomain = {
+  id: string
+  cert_id?: string
+  environment?: string
+  hostname: string
+  service: string
+  zone_id: string
+  zone_name: string
+}
+
+type DomainConnectResult = {
+  success: boolean
+  verified: boolean
+  hostname: string
+  status: DomainStatus
+  message: string
+  domain?: CloudflareWorkerDomain
+}
+
+class CloudflareApiRequestError extends Error {
+  status: number
+  errors: CloudflareApiMessage[]
+
+  constructor(status: number, errors: CloudflareApiMessage[], fallback: string) {
+    super(errors.map((error) => error.message).filter(Boolean).join(' ') || fallback)
+    this.name = 'CloudflareApiRequestError'
+    this.status = status
+    this.errors = errors
+  }
+}
+
+function normalizeHostname(input: unknown) {
+  if (typeof input !== 'string') throw new Error('Domain is required')
+
+  let hostname = input.trim().toLowerCase()
+  if (!hostname) throw new Error('Domain is required')
+
+  if (/^https?:\/\//i.test(hostname)) {
+    hostname = new URL(hostname).hostname
+  } else {
+    hostname = hostname.split('/')[0]
+  }
+
+  hostname = hostname.replace(/\.$/, '')
+  if (hostname.includes(':')) hostname = hostname.split(':')[0]
+
+  const labels = hostname.split('.')
+  const invalid =
+    hostname.length > 253 ||
+    labels.length < 2 ||
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) ||
+    labels.some(
+      (label) =>
+        label.length < 1 ||
+        label.length > 63 ||
+        label.startsWith('-') ||
+        label.endsWith('-') ||
+        !/^[a-z0-9-]+$/.test(label),
+    )
+
+  if (invalid) throw new Error('Enter a valid domain, for example blog.example.com')
+  return hostname
+}
+
+function getZoneCandidates(hostname: string) {
+  const labels = hostname.split('.')
+  const candidates: string[] = []
+  for (let index = 0; index <= labels.length - 2; index += 1) {
+    candidates.push(labels.slice(index).join('.'))
+  }
+  return candidates
+}
+
+function getCloudflareAccountConfig(env: Bindings) {
+  const token = env.CLOUDFLARE_API_TOKEN
+  const accountId = env.CLOUDFLARE_ACCOUNT_ID
+  const missing = [
+    !token ? 'CLOUDFLARE_API_TOKEN' : '',
+    !accountId ? 'CLOUDFLARE_ACCOUNT_ID' : '',
+  ].filter(Boolean)
+  return {
+    token,
+    accountId,
+    missing,
+    workerName: env.CLOUDFLARE_WORKER_NAME || 'dyeink',
+    environment: env.CLOUDFLARE_WORKER_ENVIRONMENT,
+  }
+}
+
+async function cloudflareApi<T>(
+  env: Bindings,
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const { token } = getCloudflareAccountConfig(env)
+  if (!token) throw new Error('Missing CLOUDFLARE_API_TOKEN')
+
+  const headers = new Headers(init.headers)
+  headers.set('Authorization', `Bearer ${token}`)
+  headers.set('Accept', 'application/json')
+  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+
+  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+    ...init,
+    headers,
+  })
+  const payload = (await response.json().catch(() => null)) as CloudflareEnvelope<T> | null
+  if (!response.ok || !payload?.success) {
+    throw new CloudflareApiRequestError(
+      response.status,
+      payload?.errors || [],
+      `Cloudflare API request failed with status ${response.status}`,
+    )
+  }
+  return payload.result as T
+}
+
+async function findCloudflareZone(env: Bindings, hostname: string): Promise<CloudflareZone | null> {
+  if (env.CLOUDFLARE_ZONE_ID) {
+    return {
+      id: env.CLOUDFLARE_ZONE_ID,
+      name: env.CLOUDFLARE_ZONE_NAME,
+    }
+  }
+
+  for (const candidate of getZoneCandidates(hostname)) {
+    const zones = await cloudflareApi<CloudflareZone[]>(
+      env,
+      `/zones?name=${encodeURIComponent(candidate)}&status=active&per_page=1`,
+    )
+    if (zones.length > 0) return zones[0]
+  }
+
+  return null
+}
+
+function domainInstructionTarget(c: AppCtx) {
+  const configured = c.env.CUSTOM_DOMAIN_TARGET || c.env.SITE_URL || c.env.FRONTEND_ORIGIN
+  if (configured && configured !== '*') return configured.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  return new URL(c.req.url).hostname
+}
+
+async function attachCloudflareDomain(
+  env: Bindings,
+  hostname: string,
+  zone: CloudflareZone,
+): Promise<CloudflareWorkerDomain> {
+  const { accountId, workerName, environment } = getCloudflareAccountConfig(env)
+  const body = {
+    hostname,
+    service: workerName,
+    zone_id: zone.id,
+    ...(zone.name ? { zone_name: zone.name } : {}),
+    ...(environment ? { environment } : {}),
+  }
+
+  return cloudflareApi<CloudflareWorkerDomain>(
+    env,
+    `/accounts/${accountId}/workers/domains`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    },
+  )
+}
+
+async function listCloudflareDomains(env: Bindings, hostname: string) {
+  const { accountId, workerName, environment } = getCloudflareAccountConfig(env)
+  const params = new URLSearchParams({
+    hostname,
+    service: workerName,
+    per_page: '100',
+  })
+  if (environment) params.set('environment', environment)
+  return cloudflareApi<CloudflareWorkerDomain[]>(
+    env,
+    `/accounts/${accountId}/workers/domains?${params.toString()}`,
+  )
+}
+
+async function detachCloudflareDomain(env: Bindings, domainId: string) {
+  const { accountId } = getCloudflareAccountConfig(env)
+  return cloudflareApi<{ success: true }>(env, `/accounts/${accountId}/workers/domains/${domainId}`, {
+    method: 'DELETE',
+  })
 }
 
 async function getSettingsPayload(db: D1Database) {
@@ -741,9 +975,10 @@ function isEmailServiceReady(env: Bindings) {
   return !!env.EMAIL && !!env.EMAIL_FROM && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.EMAIL_FROM)
 }
 
-function getBaseUrl(c: AppCtx) {
+function getBaseUrl(c: AppCtx, settings?: SettingsRow | null) {
   const configured = c.env.SITE_URL || c.env.FRONTEND_ORIGIN
   if (configured && configured !== '*') return configured.replace(/\/$/, '')
+  if (settings?.custom_domain) return `https://${settings.custom_domain}`
   return new URL(c.req.url).origin
 }
 
@@ -782,7 +1017,7 @@ async function sendWelcomeEmail(c: AppCtx, email: string, subscriberId: string) 
   const settings = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
     .first<SettingsRow>()
   const siteName = settings?.site_name || 'DyeInk'
-  const baseUrl = getBaseUrl(c)
+  const baseUrl = getBaseUrl(c, settings)
   const unsubscribeUrl = buildUnsubscribeUrl(baseUrl, subscriberId)
   const safeSiteName = escapeHtml(siteName)
 
@@ -817,7 +1052,7 @@ async function sendPublishedPostEmails(c: AppCtx, post: PostRow) {
   if (subscribers.length === 0) return
 
   const siteName = settings.site_name || 'DyeInk'
-  const baseUrl = getBaseUrl(c)
+  const baseUrl = getBaseUrl(c, settings)
   const postUrl = `${baseUrl}/blog/${encodeURIComponent(post.slug)}`
   const preview = buildPostPreview(post.excerpt, post.content)
   const safeTitle = escapeHtml(post.title)
@@ -964,12 +1199,23 @@ app.put('/api/settings', requireAuth, async (c) => {
     dribbbleLink?: string | null
     huggingfaceLink?: string | null
     leetcodeLink?: string | null
+    customDomain?: string | null
+    domainStatus?: DomainStatus | null
   }>()
 
   await c.env.DB.prepare('INSERT OR IGNORE INTO site_settings (id) VALUES (1)').run()
 
   const existing = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
     .first<SettingsRow>()
+
+  let normalizedCustomDomain = existing!.custom_domain
+  if (body.customDomain !== undefined) {
+    try {
+      normalizedCustomDomain = body.customDomain ? normalizeHostname(body.customDomain) : null
+    } catch (err: any) {
+      return c.json({ error: err.message || 'Invalid custom domain' }, 400)
+    }
+  }
 
   const merged = {
     site_name: body.siteName ?? existing!.site_name,
@@ -986,13 +1232,15 @@ app.put('/api/settings', requireAuth, async (c) => {
     huggingface_link:
       body.huggingfaceLink === undefined ? existing!.huggingface_link : body.huggingfaceLink,
     leetcode_link: body.leetcodeLink === undefined ? existing!.leetcode_link : body.leetcodeLink,
+    custom_domain: normalizedCustomDomain,
+    domain_status: body.domainStatus === undefined ? existing!.domain_status : body.domainStatus,
   }
 
   await c.env.DB.prepare(
     `UPDATE site_settings SET site_name = ?, site_description = ?, author_name = ?,
      author_email = ?, newsletter_enabled = ?, twitter_link = ?, linkedin_link = ?,
      github_link = ?, website_link = ?, dribbble_link = ?, huggingface_link = ?,
-     leetcode_link = ?, updated_at = unixepoch() WHERE id = 1`,
+     leetcode_link = ?, custom_domain = ?, domain_status = ?, updated_at = unixepoch() WHERE id = 1`,
   )
     .bind(
       merged.site_name,
@@ -1007,6 +1255,8 @@ app.put('/api/settings', requireAuth, async (c) => {
       merged.dribbble_link,
       merged.huggingface_link,
       merged.leetcode_link,
+      merged.custom_domain,
+      merged.domain_status,
     )
     .run()
 
@@ -1015,6 +1265,139 @@ app.put('/api/settings', requireAuth, async (c) => {
   c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
   return c.json(serializeSettings(row))
 })
+
+async function saveDomainSettings(c: AppCtx, customDomain: string | null, status: DomainStatus | null) {
+  await c.env.DB.prepare(
+    'UPDATE site_settings SET custom_domain = ?, domain_status = ?, updated_at = unixepoch() WHERE id = 1',
+  )
+    .bind(customDomain, status)
+    .run()
+  const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
+  c.executionCtx.waitUntil(refreshPublicArtifacts(c.env).catch((err) => console.error(err)))
+  return serializeSettings(row)
+}
+
+async function connectCustomDomain(c: AppCtx) {
+  const body = (await c.req.json<{ domain?: string }>().catch(() => ({}))) as { domain?: string }
+  let hostname: string
+
+  try {
+    hostname = normalizeHostname(body.domain)
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message || 'Invalid domain' }, 400)
+  }
+
+  const config = getCloudflareAccountConfig(c.env)
+  if (config.missing.length > 0) {
+    return c.json(
+      {
+        success: false,
+        error: `Cloudflare custom-domain automation is not configured. Add ${config.missing.join(
+          ' and ',
+        )} as Worker runtime secrets/variables, then try again.`,
+        missing: config.missing,
+      },
+      503,
+    )
+  }
+
+  let zone: CloudflareZone | null = null
+  try {
+    zone = await findCloudflareZone(c.env, hostname)
+  } catch (err: any) {
+    return c.json(
+      {
+        success: false,
+        error:
+          err instanceof CloudflareApiRequestError
+            ? `Could not read Cloudflare zones: ${err.message}`
+            : err.message || 'Could not read Cloudflare zones',
+      },
+      502,
+    )
+  }
+
+  if (!zone) {
+    return c.json(
+      {
+        success: false,
+        error: `${hostname} is not inside an active Cloudflare zone in this account.`,
+        requiresCloudflareZone: true,
+        instructions: {
+          target: domainInstructionTarget(c),
+          steps: [
+            'Add the domain to this Cloudflare account, or use a domain already managed by Cloudflare.',
+            'Wait until the Cloudflare zone is active.',
+            'Return here and press Connect domain again.',
+          ],
+        },
+      },
+      400,
+    )
+  }
+
+  try {
+    const domain = await attachCloudflareDomain(c.env, hostname, zone)
+    const status: DomainStatus = 'verified'
+    const settings = await saveDomainSettings(c, hostname, status)
+    const result: DomainConnectResult = {
+      success: true,
+      verified: true,
+      hostname,
+      status,
+      message: 'Domain connected! SSL is being issued. This can take 5–20 minutes.',
+      domain,
+    }
+    return c.json({ ...result, settings })
+  } catch (err: any) {
+    await saveDomainSettings(c, hostname, 'failed')
+    return c.json(
+      {
+        success: false,
+        hostname,
+        error:
+          err instanceof CloudflareApiRequestError
+            ? err.message
+            : err.message || 'Failed to add domain to Cloudflare',
+      },
+      502,
+    )
+  }
+}
+
+async function disconnectCustomDomain(c: AppCtx) {
+  const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
+  const hostname = row?.custom_domain
+
+  const config = getCloudflareAccountConfig(c.env)
+  if (hostname && config.missing.length === 0) {
+    try {
+      const domains = await listCloudflareDomains(c.env, hostname)
+      await Promise.all(domains.map((domain) => detachCloudflareDomain(c.env, domain.id)))
+    } catch (err: any) {
+      return c.json(
+        {
+          ok: false,
+          error:
+            err instanceof CloudflareApiRequestError
+              ? err.message
+              : err.message || 'Failed to remove domain from Cloudflare',
+        },
+        502,
+      )
+    }
+  }
+
+  const settings = await saveDomainSettings(c, null, null)
+  return c.json({ ok: true, settings })
+}
+
+app.post('/api/add-domain', requireAuth, connectCustomDomain)
+app.post('/api/domains/connect', requireAuth, connectCustomDomain)
+app.delete('/api/add-domain', requireAuth, disconnectCustomDomain)
+app.delete('/api/domains/connect', requireAuth, disconnectCustomDomain)
 
 // ==========================================================================
 // STATS
@@ -1063,7 +1446,10 @@ app.get('/api/hit', async (c) => {
 })
 
 app.post('/api/hit', async (c) => {
-  const body = await c.req.json<{ id?: string; type?: string }>().catch(() => ({}))
+  const body = (await c.req.json<{ id?: string; type?: string }>().catch(() => ({}))) as {
+    id?: string
+    type?: string
+  }
   return handleHit(c, body.id, body.type)
 })
 
@@ -1113,7 +1499,7 @@ app.get('/api/stats', requireAuth, async (c) => {
 // ==========================================================================
 
 app.post('/api/subscribe', async (c) => {
-  const body = await c.req.json<{ email?: string }>().catch(() => ({}))
+  const body = (await c.req.json<{ email?: string }>().catch(() => ({}))) as { email?: string }
   const email = body.email?.trim().toLowerCase()
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return c.json({ error: 'Invalid email' }, 400)
@@ -1172,7 +1558,7 @@ app.get('/api/unsubscribe', async (c) => {
 })
 
 app.post('/api/unsubscribe', async (c) => {
-  const body = await c.req.json<{ id?: string }>().catch(() => ({}))
+  const body = (await c.req.json<{ id?: string }>().catch(() => ({}))) as { id?: string }
   return unsubscribeById(c, body.id || c.req.query('id'))
 })
 

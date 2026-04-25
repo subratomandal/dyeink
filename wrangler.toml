@@ -40,6 +40,12 @@ D1_HIT_ROLLUPS = "on"
 # EMAIL_FROM = "newsletter@your-domain.com"
 # EMAIL_FROM_NAME = "DyeInk"
 
+# Optional one-click custom domain connection from Settings.
+# Add CLOUDFLARE_API_TOKEN as a secret with Workers Scripts Write permission.
+# Add CLOUDFLARE_ACCOUNT_ID as a runtime variable/secret. If the token cannot
+# list zones, also add CLOUDFLARE_ZONE_ID and CLOUDFLARE_ZONE_NAME.
+# CLOUDFLARE_WORKER_NAME defaults to "dyeink".
+
 # [[send_email]]
 # name = "EMAIL"
 # allowed_sender_addresses = ["newsletter@your-domain.com"]

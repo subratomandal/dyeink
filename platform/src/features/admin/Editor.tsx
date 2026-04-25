@@ -15,6 +15,8 @@ import {
     AlignJustify,
     Link as LinkIcon,
     Image as ImageIcon,
+    FileCode2,
+    Eye,
     Quote,
     Trash2,
 } from 'lucide-react'
@@ -39,6 +41,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import {
+    contentToMarkdownSource,
+    isMarkdownContent,
+    renderGitHubContent,
+    renderMermaidDiagrams,
+} from '@/lib/githubMarkdown'
 
 interface LinkModalProps {
     open: boolean
@@ -148,6 +156,11 @@ export default function Editor() {
     const [isPublishing, setIsPublishing] = useState(false)
     const [lastSaved, setLastSaved] = useState<Date | null>(null)
     const [initialContent, setInitialContent] = useState('')
+    const [richContent, setRichContent] = useState('')
+    const [markdownContent, setMarkdownContent] = useState('')
+    const [sourceMode, setSourceMode] = useState<'rich' | 'markdown'>('rich')
+    const [previewOpen, setPreviewOpen] = useState(false)
+    const [previewContent, setPreviewContent] = useState('')
 
     const [linkModalOpen, setLinkModalOpen] = useState(false)
     const [linkValue, setLinkValue] = useState('')
@@ -159,8 +172,11 @@ export default function Editor() {
     }>({ visible: false, x: 0, y: 0, target: null })
 
     const savedSelection = useRef<Range | null>(null)
+    const savedMarkdownSelection = useRef<{ start: number; end: number } | null>(null)
     const contentRef = useRef<HTMLDivElement>(null)
     const titleRef = useRef<HTMLDivElement>(null)
+    const markdownRef = useRef<HTMLTextAreaElement>(null)
+    const previewRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -173,7 +189,12 @@ export default function Editor() {
                     setTitle(post.title)
                     setExcerpt(post.excerpt || '')
                     setCoverImage(post.coverImage || '')
-                    setInitialContent(post.content || '')
+                    const loadedContent = post.content || ''
+                    const markdown = contentToMarkdownSource(loadedContent)
+                    setInitialContent(loadedContent)
+                    setRichContent(loadedContent)
+                    setMarkdownContent(markdown)
+                    setSourceMode(isMarkdownContent(loadedContent) ? 'markdown' : 'rich')
                 }
             } catch (e) {
                 console.error('Failed to load post:', e)
@@ -193,23 +214,77 @@ export default function Editor() {
     useEffect(() => {
         if (!loading && titleRef.current && contentRef.current) {
             if (titleRef.current.innerText.trim() === '') titleRef.current.innerText = title
-            if (contentRef.current.innerHTML.trim() === '') contentRef.current.innerHTML = initialContent
+            if (contentRef.current.innerHTML.trim() === '') contentRef.current.innerHTML = richContent || initialContent
         }
-    }, [loading, initialContent, title])
+    }, [loading, initialContent, richContent, title])
 
-    const executeCommand = (command: string, value?: string) => document.execCommand(command, false, value)
-    const executeAlignment = (command: 'justifyLeft' | 'justifyCenter' | 'justifyRight' | 'justifyFull') => {
-        document.execCommand('styleWithCSS', false, 'true')
-        document.execCommand(command, false)
+    const previewHtml = renderGitHubContent(previewContent, '')
+
+    useEffect(() => {
+        if (!previewOpen || !previewRef.current) return
+        renderMermaidDiagrams(previewRef.current)
+    }, [previewHtml, previewOpen])
+
+    useEffect(() => {
+        if (sourceMode !== 'rich' || previewOpen || !contentRef.current) return
+        if (contentRef.current.innerHTML.trim() === '') contentRef.current.innerHTML = richContent || initialContent
+    }, [initialContent, previewOpen, richContent, sourceMode])
+
+    const syncRichContent = () => {
+        setRichContent(contentRef.current?.innerHTML || '')
+    }
+
+    const executeRichCommand = (command: string, value?: string) => {
+        contentRef.current?.focus()
+        document.execCommand(command, false, value)
         contentRef.current?.dispatchEvent(new Event('input', { bubbles: true }))
+        syncRichContent()
+    }
+
+    const executeCommand = (command: string, value?: string) => {
+        if (previewOpen) setPreviewOpen(false)
+        if (sourceMode === 'markdown') {
+            executeMarkdownCommand(command, value)
+            return
+        }
+        executeRichCommand(command, value)
+    }
+
+    const executeAlignment = (command: 'justifyLeft' | 'justifyCenter' | 'justifyRight' | 'justifyFull') => {
+        if (previewOpen) setPreviewOpen(false)
+        if (sourceMode === 'markdown') {
+            const align = command === 'justifyFull' ? 'justify' : command.replace('justify', '').toLowerCase()
+            wrapMarkdownBlock(`<p align="${align}">\n`, '\n</p>', 'Aligned text')
+            return
+        }
+        document.execCommand('styleWithCSS', false, 'true')
+        executeRichCommand(command)
     }
 
     const saveSelection = () => {
+        if (sourceMode === 'markdown') {
+            const textarea = markdownRef.current
+            savedMarkdownSelection.current = textarea
+                ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+                : null
+            return
+        }
+
         const selection = window.getSelection()
         savedSelection.current =
             selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
     }
     const restoreSelection = () => {
+        if (sourceMode === 'markdown') {
+            const textarea = markdownRef.current
+            const selection = savedMarkdownSelection.current
+            if (textarea && selection) {
+                textarea.focus()
+                textarea.setSelectionRange(selection.start, selection.end)
+            }
+            return
+        }
+
         const selection = window.getSelection()
         if (selection && savedSelection.current) {
             selection.removeAllRanges()
@@ -256,15 +331,21 @@ export default function Editor() {
         try {
             const url = await postService.uploadImage(file)
             if (url) {
-                restoreSelection()
-                setTimeout(
-                    () =>
-                        executeCommand(
-                            'insertHTML',
-                            `<p><br></p><img src="${url}" alt="Uploaded image" /><p><br></p>`,
-                        ),
-                    50,
-                )
+                setPreviewOpen(false)
+                if (sourceMode === 'markdown') {
+                    restoreSelection()
+                    insertMarkdown(`\n![Uploaded image](${url})\n`, 'Uploaded image')
+                } else {
+                    restoreSelection()
+                    setTimeout(
+                        () =>
+                            executeRichCommand(
+                                'insertHTML',
+                                `<p><br></p><img src="${url}" alt="Uploaded image" /><p><br></p>`,
+                            ),
+                        50,
+                    )
+                }
             } else {
                 addToast({ type: 'error', message: 'Failed to upload image' })
             }
@@ -290,9 +371,139 @@ export default function Editor() {
         setLinkModalOpen(false)
         setTimeout(() => {
             restoreSelection()
-            if (linkValue) executeCommand('createLink', linkValue)
+            if (!linkValue) return
+            if (sourceMode === 'markdown') {
+                wrapMarkdownInline('[', `](${linkValue})`, linkValue)
+            } else {
+                if (savedSelection.current?.collapsed) {
+                    executeRichCommand(
+                        'insertHTML',
+                        `<a href="${escapeEditorAttribute(linkValue)}" target="_blank" rel="noopener noreferrer">${escapeEditorHtml(
+                            linkValue,
+                        )}</a>`,
+                    )
+                } else {
+                    executeRichCommand('createLink', linkValue)
+                }
+            }
         }, 10)
     }
+
+    const updateMarkdown = (value: string, selectionStart?: number, selectionEnd?: number) => {
+        setMarkdownContent(value)
+        requestAnimationFrame(() => {
+            if (typeof selectionStart !== 'number' || typeof selectionEnd !== 'number') return
+            markdownRef.current?.focus()
+            markdownRef.current?.setSelectionRange(selectionStart, selectionEnd)
+        })
+    }
+
+    const getMarkdownSelection = () => {
+        const textarea = markdownRef.current
+        if (!textarea) return { start: markdownContent.length, end: markdownContent.length, selected: '' }
+        return {
+            start: textarea.selectionStart,
+            end: textarea.selectionEnd,
+            selected: markdownContent.slice(textarea.selectionStart, textarea.selectionEnd),
+        }
+    }
+
+    const insertMarkdown = (value: string, fallbackSelection = '') => {
+        const { start, end, selected } = getMarkdownSelection()
+        const text = selected || fallbackSelection
+        const insertion = value.includes(fallbackSelection) ? value : value.replace('$selection', text)
+        const next = `${markdownContent.slice(0, start)}${insertion}${markdownContent.slice(end)}`
+        const cursor = start + insertion.length
+        updateMarkdown(next, cursor, cursor)
+    }
+
+    const wrapMarkdownInline = (before: string, after = before, fallback = 'text') => {
+        const { start, end, selected } = getMarkdownSelection()
+        const text = selected || fallback
+        const next = `${markdownContent.slice(0, start)}${before}${text}${after}${markdownContent.slice(end)}`
+        updateMarkdown(next, start + before.length, start + before.length + text.length)
+    }
+
+    const wrapMarkdownBlock = (before: string, after = '', fallback = 'Text') => {
+        const { start, end, selected } = getMarkdownSelection()
+        const text = selected || fallback
+        const insertion = `${before}${text}${after}`
+        const next = `${markdownContent.slice(0, start)}${insertion}${markdownContent.slice(end)}`
+        updateMarkdown(next, start + before.length, start + before.length + text.length)
+    }
+
+    const prefixMarkdownLines = (prefixer: (index: number) => string) => {
+        const { start, end } = getMarkdownSelection()
+        const lineStart = markdownContent.lastIndexOf('\n', Math.max(0, start - 1)) + 1
+        const lineEndIndex = markdownContent.indexOf('\n', end)
+        const lineEnd = lineEndIndex === -1 ? markdownContent.length : lineEndIndex
+        const block = markdownContent.slice(lineStart, lineEnd)
+        const lines = block.split('\n')
+        const nextBlock = lines.map((line, index) => `${prefixer(index)}${line.replace(/^\s*(?:[-*+]|>\s?|\d+\.)\s+/, '')}`).join('\n')
+        const next = `${markdownContent.slice(0, lineStart)}${nextBlock}${markdownContent.slice(lineEnd)}`
+        updateMarkdown(next, lineStart, lineStart + nextBlock.length)
+    }
+
+    const executeMarkdownCommand = (command: string, value?: string) => {
+        if (command === 'undo' || command === 'redo') {
+            markdownRef.current?.focus()
+            document.execCommand(command)
+            requestAnimationFrame(() => setMarkdownContent(markdownRef.current?.value || markdownContent))
+            return
+        }
+        if (command === 'bold') return wrapMarkdownInline('**', '**', 'bold text')
+        if (command === 'italic') return wrapMarkdownInline('*', '*', 'italic text')
+        if (command === 'underline') return wrapMarkdownInline('<ins>', '</ins>', 'underlined text')
+        if (command === 'insertUnorderedList') return prefixMarkdownLines(() => '- ')
+        if (command === 'insertOrderedList') return prefixMarkdownLines((index) => `${index + 1}. `)
+        if (command === 'formatBlock' && value === 'blockquote') return prefixMarkdownLines(() => '> ')
+        if (command === 'insertHTML' && value) return insertMarkdown(value)
+        if (command === 'insertText' && value) return insertMarkdown(value)
+    }
+
+    const switchToMarkdown = () => {
+        setPreviewOpen(false)
+        if (sourceMode === 'rich') {
+            setRichContent(contentRef.current?.innerHTML || richContent)
+            setMarkdownContent(contentToMarkdownSource(contentRef.current?.innerHTML || richContent))
+        }
+        setSourceMode('markdown')
+    }
+
+    const switchToRich = () => {
+        setPreviewOpen(false)
+        if (sourceMode === 'markdown') {
+            const html = renderGitHubContent(markdownContent, '')
+            setRichContent(html)
+        }
+        setSourceMode('rich')
+    }
+
+    const togglePreview = () => {
+        if (previewOpen) {
+            setPreviewOpen(false)
+            return
+        }
+        const current = sourceMode === 'markdown' ? markdownContent : contentRef.current?.innerHTML || richContent
+        if (sourceMode === 'rich') setRichContent(current)
+        setPreviewContent(current)
+        setPreviewOpen(true)
+    }
+
+    const getContentForSave = () => {
+        if (sourceMode === 'markdown') return markdownContent
+        return previewOpen ? previewContent : contentRef.current?.innerHTML || richContent
+    }
+
+    const escapeEditorHtml = (value: string) =>
+        value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+
+    const escapeEditorAttribute = (value: string) => escapeEditorHtml(value.trim())
 
     const handleSave = async (shouldPublish = false) => {
         if (!title.trim()) {
@@ -303,7 +514,7 @@ export default function Editor() {
         else setSaving(true)
 
         try {
-            const contentHtml = contentRef.current?.innerHTML || ''
+            const contentHtml = getContentForSave()
             await Promise.all([
                 id
                     ? postService.updatePost(id, {
@@ -461,6 +672,16 @@ export default function Editor() {
                         <ToolbarButton onClick={handleImage} title="Image">
                             <ImageIcon className="h-4 w-4" />
                         </ToolbarButton>
+                        <ToolbarDivider />
+                        <ToolbarButton
+                            onClick={() => (sourceMode === 'markdown' ? switchToRich() : switchToMarkdown())}
+                            title={sourceMode === 'markdown' ? 'Rich Text' : 'Markdown Source'}
+                        >
+                            <FileCode2 className={cn('h-4 w-4', sourceMode === 'markdown' && 'text-foreground')} />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={togglePreview} title={previewOpen ? 'Edit' : 'Preview'}>
+                            <Eye className={cn('h-4 w-4', previewOpen && 'text-foreground')} />
+                        </ToolbarButton>
                     </div>
                 </div>
 
@@ -495,20 +716,46 @@ export default function Editor() {
                     }}
                 />
 
-                <div
-                    ref={contentRef}
-                    contentEditable
-                    className="editor-content-editable min-h-[60vh] w-full break-words whitespace-pre-wrap bg-transparent text-lg leading-relaxed text-foreground outline-none"
-                    data-placeholder="Start writing..."
-                    onContextMenu={handleContextMenu}
-                    onClick={handleContentClick}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Tab') {
-                            e.preventDefault()
-                            document.execCommand('insertText', false, '\t')
-                        }
-                    }}
-                />
+                {previewOpen ? (
+                    <div
+                        ref={previewRef}
+                        className="editor-preview post-content min-h-[60vh] w-full break-words text-lg leading-relaxed text-foreground"
+                        dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    />
+                ) : sourceMode === 'markdown' ? (
+                    <textarea
+                        ref={markdownRef}
+                        value={markdownContent}
+                        spellCheck
+                        className="editor-markdown-source min-h-[60vh] w-full resize-none break-words border-0 bg-transparent font-mono text-base leading-relaxed text-foreground outline-none"
+                        placeholder="Write Markdown here. Fenced ```mermaid blocks render in Preview and on the live blog."
+                        onChange={(e) => setMarkdownContent(e.target.value)}
+                        onSelect={saveSelection}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Tab') {
+                                e.preventDefault()
+                                insertMarkdown('    ')
+                            }
+                        }}
+                    />
+                ) : (
+                    <div
+                        ref={contentRef}
+                        contentEditable
+                        className="editor-content-editable min-h-[60vh] w-full break-words whitespace-pre-wrap bg-transparent text-lg leading-relaxed text-foreground outline-none"
+                        data-placeholder="Start writing..."
+                        onContextMenu={handleContextMenu}
+                        onClick={handleContentClick}
+                        onInput={(e) => setRichContent(e.currentTarget.innerHTML)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Tab') {
+                                e.preventDefault()
+                                document.execCommand('insertText', false, '\t')
+                                syncRichContent()
+                            }
+                        }}
+                    />
+                )}
             </div>
 
             <style>{`
@@ -525,6 +772,17 @@ export default function Editor() {
                 .editor-content-editable p { margin: 1em 0; }
                 .editor-content-editable ul { list-style-type: disc; padding-left: 1.5em; margin: 1em 0; }
                 .editor-content-editable ol { list-style-type: decimal; padding-left: 1.5em; margin: 1em 0; }
+                .editor-markdown-source {
+                    tab-size: 4;
+                    white-space: pre-wrap;
+                }
+                .editor-preview > *:first-child { margin-top: 0; }
+                .editor-preview h1 { font-size: 2.35em; margin: 0.67em 0; font-weight: 700; line-height: 1.16; }
+                .editor-preview h2 { font-size: 1.85em; margin: 0.75em 0; font-weight: 650; line-height: 1.24; }
+                .editor-preview h3 { font-size: 1.45em; margin: 0.83em 0; font-weight: 650; line-height: 1.32; }
+                .editor-preview p { margin: 1em 0; }
+                .editor-preview ul { list-style-type: disc; padding-left: 1.5em; margin: 1em 0; }
+                .editor-preview ol { list-style-type: decimal; padding-left: 1.5em; margin: 1em 0; }
                 .editor-content-editable blockquote {
                     border-left: 4px solid hsl(var(--border));
                     padding-left: 1rem; margin: 1rem 0; font-style: italic;
@@ -532,6 +790,86 @@ export default function Editor() {
                 }
                 .editor-content-editable img { max-width: 100% !important; height: auto !important; border-radius: 0.5rem; margin: 1rem 0; display: block; }
                 .editor-content-editable a { color: hsl(var(--foreground)); text-decoration: underline; }
+                .editor-preview a { color: hsl(var(--foreground)); text-decoration: underline; }
+                .editor-preview img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1rem 0; display: block; }
+                .editor-preview pre,
+                .editor-preview .github-mermaid,
+                .editor-preview .github-diagram,
+                .editor-preview .github-math-block {
+                    max-width: 100%;
+                    overflow-x: auto;
+                    border: 1px solid hsl(var(--border));
+                    border-radius: 0.75rem;
+                    padding: 1rem;
+                    background: hsl(var(--card));
+                }
+                .editor-preview code,
+                .editor-preview pre {
+                    font-family: var(--font-mono);
+                    font-size: 0.9em;
+                }
+                .editor-preview .github-youtube-embed {
+                    position: relative;
+                    width: 100%;
+                    aspect-ratio: 16 / 9;
+                    overflow: hidden;
+                    border: 1px solid hsl(var(--border));
+                    border-radius: 0.75rem;
+                    background: #000;
+                }
+                .editor-preview .github-youtube-embed iframe {
+                    position: absolute;
+                    inset: 0;
+                    width: 100%;
+                    height: 100%;
+                }
+                .editor-preview .github-markdown-table {
+                    display: block;
+                    width: 100%;
+                    overflow-x: auto;
+                    border-collapse: collapse;
+                }
+                .editor-preview .github-markdown-table th,
+                .editor-preview .github-markdown-table td {
+                    border: 1px solid hsl(var(--border));
+                    padding: 0.65rem 0.8rem;
+                }
+                .editor-preview .github-alert {
+                    border-left: 4px solid #0969da;
+                    border-radius: 0.65rem;
+                    padding: 0.85rem 1rem;
+                    background: rgba(9, 105, 218, 0.08);
+                }
+                .editor-preview .github-alert-title {
+                    margin-bottom: 0.35rem;
+                    font-family: var(--font-mono);
+                    font-size: 0.78rem;
+                    font-weight: 700;
+                    letter-spacing: 0.08em;
+                    color: #0969da;
+                }
+                .editor-preview .github-alert-tip { border-left-color: #1a7f37; background: rgba(26, 127, 55, 0.08); }
+                .editor-preview .github-alert-tip .github-alert-title { color: #1a7f37; }
+                .editor-preview .github-alert-important { border-left-color: #8250df; background: rgba(130, 80, 223, 0.08); }
+                .editor-preview .github-alert-important .github-alert-title { color: #8250df; }
+                .editor-preview .github-alert-warning { border-left-color: #9a6700; background: rgba(154, 103, 0, 0.1); }
+                .editor-preview .github-alert-warning .github-alert-title { color: #9a6700; }
+                .editor-preview .github-alert-caution { border-left-color: #cf222e; background: rgba(207, 34, 46, 0.08); }
+                .editor-preview .github-alert-caution .github-alert-title { color: #cf222e; }
+                .editor-preview .github-task-list { list-style: none; padding-left: 0 !important; }
+                .editor-preview .github-task-list-item { display: flex; align-items: flex-start; gap: 0.5rem; }
+                .editor-preview .github-task-list-item input { margin-top: 0.32em; }
+                .editor-preview .github-mermaid svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+                .editor-preview .github-mermaid-fallback::before {
+                    content: 'Mermaid source';
+                    display: block;
+                    margin-bottom: 0.5rem;
+                    font-family: var(--font-mono);
+                    font-size: 0.75rem;
+                    color: hsl(var(--muted-foreground));
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                }
                 @media (max-width: 640px) {
                     .editor-toolbar-nav {
                         grid-template-columns: auto 1fr !important;
@@ -575,6 +913,13 @@ export default function Editor() {
                     .editor-content-editable {
                         font-size: 1.04rem !important;
                         line-height: 1.72 !important;
+                        min-height: 52vh !important;
+                        padding-bottom: 7rem !important;
+                    }
+                    .editor-markdown-source,
+                    .editor-preview {
+                        font-size: 0.96rem !important;
+                        line-height: 1.68 !important;
                         min-height: 52vh !important;
                         padding-bottom: 7rem !important;
                     }

@@ -13,6 +13,8 @@ export interface SiteSettings {
     dribbbleLink: string | null
     huggingfaceLink: string | null
     leetcodeLink: string | null
+    customDomain: string | null
+    domainStatus: 'pending' | 'verified' | 'active' | 'failed' | null
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -28,6 +30,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
     dribbbleLink: null,
     huggingfaceLink: null,
     leetcodeLink: null,
+    customDomain: null,
+    domainStatus: null,
 }
 
 const PUBLIC_CONTENT_BASE = (import.meta.env.VITE_PUBLIC_CONTENT_URL || '').replace(/\/$/, '')
@@ -58,6 +62,22 @@ async function getApiSettings(): Promise<SiteSettings | null> {
 
 interface GetSettingsOptions {
     preferFresh?: boolean
+}
+
+export interface DomainConnectResponse {
+    success: boolean
+    verified?: boolean
+    hostname?: string
+    status?: SiteSettings['domainStatus']
+    message?: string
+    error?: string
+    missing?: string[]
+    requiresCloudflareZone?: boolean
+    instructions?: {
+        target?: string
+        steps?: string[]
+    }
+    settings?: SiteSettings
 }
 
 export const settingsService = {
@@ -114,6 +134,28 @@ export const settingsService = {
 
     async changePassword(current: string, next: string): Promise<void> {
         await apiClient.post('/auth/change-password', { current, next })
+    },
+
+    async verifyDomain(domain: string): Promise<DomainConnectResponse> {
+        try {
+            const response = await apiClient.post<DomainConnectResponse>('/add-domain', { domain })
+            publicSettingsCache = null
+            apiSettingsPrefetch = null
+            return response.data
+        } catch (err: any) {
+            return {
+                success: false,
+                ...(err?.response?.data || {}),
+                error: err?.response?.data?.error || err.message || 'Failed to connect domain',
+            }
+        }
+    },
+
+    async disconnectDomain(): Promise<{ ok: boolean; settings?: SiteSettings }> {
+        const response = await apiClient.delete<{ ok: boolean; settings?: SiteSettings }>('/add-domain')
+        publicSettingsCache = null
+        apiSettingsPrefetch = null
+        return response.data
     },
 }
 
