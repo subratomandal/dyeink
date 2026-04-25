@@ -6,7 +6,7 @@ import { useAdminStore } from '@/stores/adminStore'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import DecryptedText from '@/components/common/animations/DecryptedText'
-import Grainient from '@/components/common/animations/Grainient'
+import Iridescence from '@/components/common/animations/Iridescence'
 import AdminGreeting from './AdminGreeting'
 import NewPostButton from './sidebar/NewPostButton'
 import { cn } from '@/lib/utils'
@@ -146,30 +146,12 @@ export default function AdminLayout() {
     return (
         <div className="flex min-h-screen bg-background">
             <aside className="admin-sidebar-shell fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]">
-                <div className="admin-sidebar-grainient">
-                    <Grainient
-                        color1="#f7f7f7"
-                        color2="#050505"
-                        color3="#8a8a8a"
-                        timeSpeed={0.25}
-                        colorBalance={0}
-                        warpStrength={1}
-                        warpFrequency={5}
-                        warpSpeed={2}
-                        warpAmplitude={50}
-                        blendAngle={0}
-                        blendSoftness={0.05}
-                        rotationAmount={500}
-                        noiseScale={2}
-                        grainAmount={0.1}
-                        grainScale={2}
-                        grainAnimated={false}
-                        contrast={1.5}
-                        gamma={1}
-                        saturation={0}
-                        centerX={0}
-                        centerY={0}
-                        zoom={0.9}
+                <div className="admin-sidebar-iridescence">
+                    <Iridescence
+                        color={[0.23921568627450981, 0.24705882352941178, 0.25098039215686274]}
+                        mouseReact
+                        amplitude={0.04}
+                        speed={0.08}
                     />
                 </div>
                 <div className="admin-sidebar-greeting px-5 pb-4 pt-8">
@@ -237,35 +219,35 @@ export default function AdminLayout() {
                     isolation: isolate;
                     overflow: hidden;
                 }
-                .admin-sidebar-grainient {
+                .admin-sidebar-iridescence {
                     position: absolute;
                     inset: 0;
                     z-index: 0;
                     pointer-events: none;
-                    opacity: 0.34;
+                    opacity: 0.48;
                 }
-                .admin-sidebar-grainient::after {
+                .admin-sidebar-iridescence::after {
                     content: "";
                     position: absolute;
                     inset: 0;
                     background:
-                        linear-gradient(180deg, hsl(var(--card) / 0.66), hsl(var(--background) / 0.42)),
-                        radial-gradient(circle at 18% 0%, hsl(var(--foreground) / 0.08), transparent 38%);
+                        linear-gradient(180deg, hsl(var(--card) / 0.62), hsl(var(--background) / 0.48)),
+                        radial-gradient(circle at 15% 0%, hsl(var(--foreground) / 0.1), transparent 40%);
                 }
-                .dark .admin-sidebar-grainient {
-                    opacity: 0.42;
+                .dark .admin-sidebar-iridescence {
+                    opacity: 0.62;
                 }
-                .dark .admin-sidebar-grainient::after {
+                .dark .admin-sidebar-iridescence::after {
                     background:
-                        linear-gradient(180deg, rgb(8 8 8 / 0.48), rgb(8 8 8 / 0.66)),
-                        radial-gradient(circle at 18% 0%, rgb(255 255 255 / 0.08), transparent 38%);
+                        linear-gradient(180deg, rgb(8 8 8 / 0.58), rgb(8 8 8 / 0.72)),
+                        radial-gradient(circle at 15% 0%, rgb(255 255 255 / 0.1), transparent 40%);
                 }
-                .admin-sidebar-shell > :not(.admin-sidebar-grainient) {
+                .admin-sidebar-shell > :not(.admin-sidebar-iridescence) {
                     position: relative;
                     z-index: 1;
                 }
                 @media (max-width: 640px) {
-                    .admin-sidebar-grainient {
+                    .admin-sidebar-iridescence {
                         display: none !important;
                     }
                     aside {
