@@ -2,8 +2,9 @@
  * Password + session primitives using the Web Crypto API only.
  *
  * Workers can't load native modules, so Argon2 is off the table. PBKDF2-SHA256
- * with 600 000 iterations matches OWASP 2023 guidance for password hashing with
- * PBKDF2 and is what 1Password uses.
+ * Cloudflare's Workers runtime caps PBKDF2 iterations, so this uses the highest
+ * broadly compatible iteration count for workerd. Strong password policy and
+ * login rate limiting are mandatory compensating controls.
  *
  * Sessions are signed tokens (HMAC-SHA256) — no server-side store needed.
  * Format: base64url(payload).base64url(signature), where payload is JSON
@@ -13,7 +14,7 @@
 
 const TEXT = new TextEncoder()
 
-const PBKDF2_ITER = 600_000
+const PBKDF2_ITER = 100_000
 const PBKDF2_HASH = 'SHA-256'
 const PBKDF2_LEN = 32 // bytes → 256 bits
 
@@ -72,20 +73,25 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const salt = fromBase64Url(parts[2])
   const expected = fromBase64Url(parts[3])
 
-  const keyMat = await crypto.subtle.importKey(
-    'raw',
-    TEXT.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits'],
-  )
-  const bits = new Uint8Array(
-    await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt, iterations: iter, hash: PBKDF2_HASH },
-      keyMat,
-      expected.length * 8,
-    ),
-  )
+  let bits: Uint8Array
+  try {
+    const keyMat = await crypto.subtle.importKey(
+      'raw',
+      TEXT.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveBits'],
+    )
+    bits = new Uint8Array(
+      await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt, iterations: iter, hash: PBKDF2_HASH },
+        keyMat,
+        expected.length * 8,
+      ),
+    )
+  } catch {
+    return false
+  }
 
   // Constant-time compare
   if (bits.length !== expected.length) return false

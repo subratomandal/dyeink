@@ -58,7 +58,7 @@ flowchart TB
 
 ### Security
 
-1. Password Auth: One admin password, hashed with PBKDF2-SHA256 (600 000 iterations, OWASP 2023 spec)
+1. Password Auth: One admin password, hashed with PBKDF2-SHA256 using Cloudflare Workers' runtime-compatible iteration limit
 2. Session Tokens: HMAC-SHA256 signed payloads in `HttpOnly`, `Secure`, `SameSite=Strict` cookies. No JWT libraries, no third-party identity provider
 3. Rotating Server Secret: Each Worker stores its own random session-signing secret in D1. Changing the password rotates the secret and instantly invalidates all other sessions
 4. Rate Limiting: 10 failed `/auth/login` attempts per IP in 15 minutes triggers a 429. Stored in a TTL'd D1 table

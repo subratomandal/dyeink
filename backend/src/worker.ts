@@ -36,6 +36,11 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
+app.onError((err, c) => {
+  console.error(err)
+  return c.json({ error: 'Internal server error' }, 500)
+})
+
 // ---------- Global middleware ----------
 
 app.use('/api/*', (c, next) => {

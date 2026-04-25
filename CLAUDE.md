@@ -33,7 +33,7 @@ This is an **all-Cloudflare, single-admin personal blog**. One Worker serves bot
 2. `/img/:key` — proxies an R2 object back to the browser when no `R2_PUBLIC_URL` is configured
 3. Anything else — handed to `c.env.ASSETS.fetch(c.req.raw)`, which serves the built SPA from `platform/dist`. The `[assets]` block in `wrangler.toml` wires this up with `not_found_handling = "single-page-application"` so SPA routes resolve correctly on hard reload
 
-Auth helpers live in `backend/src/lib/crypto.ts` — PBKDF2-SHA256 (600 000 iterations) for password hashing, HMAC-SHA256 for session token signing. No native deps; everything goes through Web Crypto. Session cookies are `dyeink_session`, HTTPOnly + Secure + SameSite=Strict, 7-day expiry.
+Auth helpers live in `backend/src/lib/crypto.ts` — PBKDF2-SHA256 at Cloudflare Workers' runtime-compatible iteration limit for password hashing, HMAC-SHA256 for session token signing. No native deps; everything goes through Web Crypto. Session cookies are `dyeink_session`, HTTPOnly + Secure + SameSite=Strict, 7-day expiry.
 
 ### Single-admin model
 
