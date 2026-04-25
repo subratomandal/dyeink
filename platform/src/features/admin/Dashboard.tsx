@@ -74,7 +74,7 @@ export default function Dashboard() {
                 </div>
 
                 <Card className="overflow-hidden border-border bg-transparent shadow-none">
-                    <CardContent className="p-4 sm:p-6">
+                    <CardContent className="px-0 py-4 sm:py-6">
                         <div className="h-[300px] w-full min-w-0 overflow-hidden">
                             {!ready || graphData.length === 0 ? (
                                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -171,7 +171,7 @@ function NativeAreaChart({ data }: { data: ChartPoint[] }) {
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-full w-full max-w-[720px] overflow-hidden"
+            className="block h-full w-full max-w-[748px] overflow-hidden"
             role="img"
             aria-label="Views and shares over time"
         >

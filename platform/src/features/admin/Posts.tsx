@@ -63,7 +63,7 @@ export default function Posts() {
                     No published posts yet.
                 </div>
             ) : (
-                <section className="animate-fade-in overflow-hidden rounded-2xl border border-border bg-transparent">
+                <section className="animate-fade-in overflow-hidden rounded-2xl bg-transparent">
                     <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_92px] items-center border-b border-border bg-transparent px-5 py-3 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
                         <div>Post</div>
                         <div>Status</div>

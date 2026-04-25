@@ -12,6 +12,7 @@ import {
     AlignLeft,
     AlignCenter,
     AlignRight,
+    AlignJustify,
     Link as LinkIcon,
     Image as ImageIcon,
     Quote,
@@ -93,9 +94,10 @@ function ToolbarButton({
         <button
             type="button"
             title={title}
+            aria-label={title}
             onMouseDown={(e) => e.preventDefault()}
             onClick={onClick}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-md p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
             {children}
         </button>
@@ -384,9 +386,10 @@ export default function Editor() {
                         variant="outline"
                         size="icon"
                         onClick={() => navigate(-1)}
-                        className="h-10 w-10 rounded-full"
+                        aria-label="Back"
+                        className="h-10 w-10 rounded-full p-0"
                     >
-                        <ChevronLeft className="h-5 w-5" />
+                        <ChevronLeft className="h-5 w-5 translate-x-px" />
                     </Button>
                     {lastSaved && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -396,60 +399,63 @@ export default function Editor() {
                     )}
                 </div>
 
-                <div className="min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]">
-                    <div className="flex w-max items-center gap-1">
-                    <ToolbarButton onClick={() => executeCommand('undo')} title="Undo">
-                        <Undo className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton onClick={() => executeCommand('redo')} title="Redo">
-                        <Redo className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarDivider />
-                    <ToolbarButton onClick={() => executeCommand('bold')} title="Bold">
-                        <Bold className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton onClick={() => executeCommand('italic')} title="Italic">
-                        <Italic className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton onClick={() => executeCommand('underline')} title="Underline">
-                        <Underline className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarDivider />
-                    <ToolbarButton
-                        onClick={() => executeCommand('insertUnorderedList')}
-                        title="Bullet List"
-                    >
-                        <List className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton
-                        onClick={() => executeCommand('insertOrderedList')}
-                        title="Numbered List"
-                    >
-                        <ListOrdered className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton
-                        onClick={() => executeCommand('formatBlock', 'blockquote')}
-                        title="Quote"
-                    >
-                        <Quote className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarDivider />
-                    <ToolbarButton onClick={() => executeCommand('justifyLeft')} title="Align Left">
-                        <AlignLeft className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton onClick={() => executeCommand('justifyCenter')} title="Align Center">
-                        <AlignCenter className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton onClick={() => executeCommand('justifyRight')} title="Align Right">
-                        <AlignRight className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarDivider />
-                    <ToolbarButton onClick={handleLink} title="Link">
-                        <LinkIcon className="h-4 w-4" />
-                    </ToolbarButton>
-                    <ToolbarButton onClick={handleImage} title="Image">
-                        <ImageIcon className="h-4 w-4" />
-                    </ToolbarButton>
+                <div className="flex min-w-0 justify-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]">
+                    <div className="flex w-max items-center justify-center gap-1">
+                        <ToolbarButton onClick={() => executeCommand('undo')} title="Undo">
+                            <Undo className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={() => executeCommand('redo')} title="Redo">
+                            <Redo className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarDivider />
+                        <ToolbarButton onClick={() => executeCommand('bold')} title="Bold">
+                            <Bold className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={() => executeCommand('italic')} title="Italic">
+                            <Italic className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={() => executeCommand('underline')} title="Underline">
+                            <Underline className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarDivider />
+                        <ToolbarButton
+                            onClick={() => executeCommand('insertUnorderedList')}
+                            title="Bullet List"
+                        >
+                            <List className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton
+                            onClick={() => executeCommand('insertOrderedList')}
+                            title="Numbered List"
+                        >
+                            <ListOrdered className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton
+                            onClick={() => executeCommand('formatBlock', 'blockquote')}
+                            title="Quote"
+                        >
+                            <Quote className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarDivider />
+                        <ToolbarButton onClick={() => executeCommand('justifyLeft')} title="Align Left">
+                            <AlignLeft className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={() => executeCommand('justifyCenter')} title="Align Center">
+                            <AlignCenter className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={() => executeCommand('justifyRight')} title="Align Right">
+                            <AlignRight className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={() => executeCommand('justifyFull')} title="Justify">
+                            <AlignJustify className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarDivider />
+                        <ToolbarButton onClick={handleLink} title="Link">
+                            <LinkIcon className="h-4 w-4" />
+                        </ToolbarButton>
+                        <ToolbarButton onClick={handleImage} title="Image">
+                            <ImageIcon className="h-4 w-4" />
+                        </ToolbarButton>
                     </div>
                 </div>
 

@@ -206,7 +206,7 @@ export default function Blog() {
                             Post not found.
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: slug ? 0 : '2.5rem' }}>
                             {(slug ? detailPosts : pagePosts).map((post, index) => (
                                 <BlogArticle
                                     key={post.id}
@@ -288,8 +288,8 @@ function BlogSidebar({
 
     return (
         <aside style={{ position: 'sticky', top: '4rem', height: 'fit-content' }}>
-            <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
                     <h1
                         style={{
                             fontFamily: "'Jost', sans-serif",
@@ -302,7 +302,7 @@ function BlogSidebar({
                             WebkitBoxOrient: 'vertical',
                             overflow: 'hidden',
                             wordBreak: 'break-word',
-                            lineHeight: 1.2,
+                            lineHeight: 1.15,
                             margin: 0,
                         }}
                     >
@@ -311,12 +311,12 @@ function BlogSidebar({
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 {slug ? (
                     <Link
                         to="/blog"
                         className="sidebar-link"
-                        style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        style={{ fontSize: '0.95rem', lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                     >
                         <ArrowLeft size={16} /> All Posts
                     </Link>
@@ -336,9 +336,10 @@ function BlogSidebar({
                             fontFamily: "'Jost', sans-serif",
                             fontWeight: 400,
                             fontSize: '0.95rem',
+                            lineHeight: 1.35,
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem',
+                            gap: '0.35rem',
                         }}
                     >
                         Subscribe by email
@@ -346,7 +347,7 @@ function BlogSidebar({
                 )}
 
                 {!slug && (
-                    <div className="sidebar-search-wrapper" style={{ margin: '0.5rem 0' }}>
+                    <div className="sidebar-search-wrapper" style={{ margin: '0.35rem 0' }}>
                         <input
                             className="blog-search-input"
                             type="text"
@@ -366,7 +367,7 @@ function BlogSidebar({
                     </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.1rem' }}>
                     {visibleSocials.map((social) => (
                         <a
                             key={social.label}
@@ -416,8 +417,8 @@ function BlogArticle({
             style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1.5rem',
-                paddingBottom: '3rem',
+                gap: '1rem',
+                paddingBottom: isDetail ? '2rem' : '1.75rem',
                 borderBottom: !isLast ? '1px dashed var(--border-color)' : 'none',
             }}
         >
@@ -494,7 +495,7 @@ function BlogArticle({
 
             <div
                 style={{
-                    marginTop: '1.5rem',
+                    marginTop: '0.5rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -567,7 +568,8 @@ function BlogStyle() {
             .sidebar-link {
                 color: var(--text-secondary);
                 text-decoration: none;
-                font-size: 1rem;
+                font-size: 0.95rem;
+                line-height: 1.35;
                 transition: color 0.2s;
             }
             .sidebar-link:hover {
@@ -605,7 +607,7 @@ function BlogStyle() {
                     margin-bottom: 0.5rem;
                 }
                 aside > div:first-child {
-                    margin-bottom: 0.75rem !important;
+                    margin-bottom: 0.65rem !important;
                 }
                 aside > div:first-child h1 {
                     font-size: 2.2rem !important;
@@ -613,20 +615,20 @@ function BlogStyle() {
                     line-height: 1.1 !important;
                 }
                 aside > div:last-child {
-                    gap: 0.2rem !important;
+                    gap: 0.3rem !important;
                 }
                 .blog-search-input {
                     margin: 0 !important;
                 }
                 aside > div:last-child > .sidebar-search-wrapper {
                     margin: 0 !important;
-                    margin-top: 0.6rem !important;
+                    margin-top: 0.45rem !important;
                 }
                 aside > div:last-child > div:last-child {
                     flex-direction: row !important;
-                    gap: 1.25rem !important;
+                    gap: 0.8rem !important;
                     margin: 0 !important;
-                    margin-top: 0.65rem !important;
+                    margin-top: 0.45rem !important;
                     padding: 0 !important;
                     display: flex !important;
                     align-items: center !important;
@@ -640,11 +642,11 @@ function BlogStyle() {
                     padding-top: 0 !important;
                 }
                 main > div {
-                    gap: 3rem !important;
+                    gap: 2rem !important;
                 }
                 article {
                     gap: 1rem !important;
-                    padding-bottom: 2rem !important;
+                    padding-bottom: 1.5rem !important;
                 }
                 article h2 {
                     font-size: 1.3rem !important;
