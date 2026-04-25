@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Trash2, Edit2 } from 'lucide-react'
+import { CalendarDays, CircleCheck, FileText, PencilLine, Trash2 } from 'lucide-react'
 import { postService } from '@/services/postService'
 import { useAdminStore } from '@/stores/adminStore'
 import { useToast } from '@/components/common/feedback/Toast'
 import PostsSkeleton from '@/components/admin/skeletons/PostsSkeleton'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -64,58 +63,65 @@ export default function Posts() {
                     No published posts yet.
                 </div>
             ) : (
-                <section className="animate-fade-in overflow-hidden rounded-xl border border-border bg-card">
-                    <div className="hidden grid-cols-[minmax(0,1fr)_120px_140px_92px] items-center border-b border-border bg-muted/25 px-5 py-3 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
-                        <div>Title</div>
+                <section className="animate-fade-in overflow-hidden rounded-2xl border border-border bg-card">
+                    <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_92px] items-center border-b border-border bg-muted/20 px-5 py-3 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
+                        <div>Post</div>
                         <div>Status</div>
                         <div>Date</div>
-                        <div className="text-right">Actions</div>
+                        <div className="text-right">Edit</div>
                     </div>
 
                     <div className="divide-y divide-border">
                         {filteredPosts.map((post, index) => (
                             <article
                                 key={post.id}
-                                className="grid gap-3 px-4 py-4 transition-colors hover:bg-accent/35 md:grid-cols-[minmax(0,1fr)_120px_140px_92px] md:items-center md:px-5"
+                                className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_130px_150px_92px] md:items-center md:px-5"
                             >
-                                <div className="min-w-0">
-                                    <div className="mb-1 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                                        Published #{String(index + 1).padStart(2, '0')}
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+                                        <FileText className="h-4 w-4" />
                                     </div>
-                                    <Link
-                                        to={`/admin/posts/${post.id}/edit`}
-                                        className="block max-w-full truncate font-heading text-lg font-medium leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
-                                        title={post.title}
-                                    >
-                                        {post.title}
-                                    </Link>
+                                    <div className="min-w-0">
+                                        <div className="mb-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                            #{String(index + 1).padStart(2, '0')}
+                                        </div>
+                                        <Link
+                                            to={`/admin/posts/${post.id}/edit`}
+                                            className="block truncate font-heading text-lg font-medium leading-tight tracking-tight text-foreground underline-offset-4 hover:underline"
+                                            title={post.title}
+                                        >
+                                            {post.title}
+                                        </Link>
+                                    </div>
                                 </div>
 
-                                <div className="flex items-center justify-between gap-3 md:block">
+                                <div className="flex items-center justify-between gap-3 md:justify-start">
                                     <span className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted-foreground md:hidden">
                                         Status
                                     </span>
-                                    <Badge variant={post.published ? 'success' : 'warning'} className="rounded-full px-2.5 py-0.5">
-                                        {post.published ? 'Published' : 'Draft'}
-                                    </Badge>
+                                    <span className="inline-flex items-center gap-2 whitespace-nowrap text-sm text-emerald-500">
+                                        <CircleCheck className="h-4 w-4" />
+                                        Published
+                                    </span>
                                 </div>
 
-                                <div className="flex items-center justify-between gap-3 md:block">
+                                <div className="flex items-center justify-between gap-3 md:justify-start">
                                     <span className="font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted-foreground md:hidden">
                                         Date
                                     </span>
                                     <time
                                         dateTime={post.createdAt}
-                                        className="font-mono text-xs text-muted-foreground"
+                                        className="inline-flex items-center gap-2 whitespace-nowrap font-mono text-xs text-muted-foreground"
                                     >
+                                        <CalendarDays className="h-4 w-4" />
                                         {formatDateShort(post.createdAt)}
                                     </time>
                                 </div>
 
                                 <div className="flex justify-end gap-2">
-                                    <Button asChild size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+                                    <Button asChild size="icon" variant="ghost" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground">
                                         <Link to={`/admin/posts/${post.id}/edit`} aria-label={`Edit ${post.title}`}>
-                                            <Edit2 className="h-4 w-4" />
+                                            <PencilLine className="h-4 w-4" />
                                         </Link>
                                     </Button>
                                     <Button
