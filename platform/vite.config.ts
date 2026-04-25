@@ -11,13 +11,15 @@ export default defineConfig({
     },
     server: {
         port: 5173,
+        // The Worker (wrangler dev) listens on 8787 by default; point at it
+        // so /api requests work in dev without a separate Fastify server.
         proxy: {
             '/api': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:8787',
                 changeOrigin: true,
             },
-            '/uploads': {
-                target: 'http://localhost:3000',
+            '/img': {
+                target: 'http://localhost:8787',
                 changeOrigin: true,
             },
         },
@@ -30,11 +32,9 @@ export default defineConfig({
                     'vendor-react': ['react', 'react-dom', 'react-router-dom'],
                     'vendor-ui': ['framer-motion', 'lucide-react', 'recharts', 'clsx', 'tailwind-merge'],
                     'vendor-3d': ['three', 'ogl', 'postprocessing', 'gsap'],
-                    'vendor-utils': ['date-fns', 'dompurify', '@auth0/auth0-spa-js', 'zustand', 'axios']
-                }
-            }
-        }
-    }
+                    'vendor-utils': ['date-fns', 'dompurify', 'zustand', 'axios', 'sonner'],
+                },
+            },
+        },
+    },
 })
-
-

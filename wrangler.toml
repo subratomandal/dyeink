@@ -1,0 +1,38 @@
+#:schema node_modules/wrangler/config-schema.json
+#
+# Cloudflare Pages config for DyeInk.
+#
+# When the Pages build runs, it produces:
+#   platform/dist/                -- static SPA (HTML/CSS/JS)
+#   platform/dist/_worker.js      -- bundled Hono Worker (built by scripts/bundle-worker.mjs)
+#
+# Pages serves the static files and routes any request that _worker.js
+# wants to handle to it. The bindings below are picked up automatically
+# from this file (Pages reads wrangler.toml at the repo root since
+# Wrangler 3.45+ when connected via Git).
+#
+# IMPORTANT: D1 and R2 resources still have to exist. Create them once with:
+#   npx wrangler d1 create dyeink              # copy the id below
+#   npx wrangler r2 bucket create dyeink-images
+#   npx wrangler d1 migrations apply dyeink --remote
+#
+# Or run this in the dashboard: D1 → Create database / R2 → Create bucket.
+
+name = "dyeink"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "platform/dist"
+
+# -------- D1: relational storage --------
+# Replace database_id with the value `wrangler d1 create dyeink` prints,
+# or paste it once in the Pages dashboard → Settings → Functions → Bindings.
+[[d1_databases]]
+binding = "DB"
+database_name = "dyeink"
+database_id = "__REPLACE_WITH_YOUR_D1_ID__"
+migrations_dir = "backend/migrations"
+
+# -------- R2: image uploads --------
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "dyeink-images"

@@ -14,15 +14,15 @@ Most blog platforms either lock you into a walled garden or hand you a Wordpress
 
 What "single deploy" means here:
 
-1. Click the Deploy to Cloudflare button
-2. Cloudflare provisions D1, R2, the Worker, and the static SPA bundle in one go
-3. Open your new `*.workers.dev` URL — the first visit walks you through choosing an admin password
+1. Click the Deploy to Cloudflare button (or connect the repo to Pages)
+2. Cloudflare provisions D1, R2, and the Worker in one go
+3. Open your new URL — the first visit walks you through choosing an admin password
 4. You're writing posts within a minute
 
 Supported deploy targets:
 
-1. Cloudflare Workers + D1 + R2 (the recommended path — what the deploy button uses)
-2. Cloudflare Pages + a separately-deployed Worker (if you prefer to split frontend / backend)
+1. Cloudflare Workers (deploy button — auto-provisions D1 + R2)
+2. Cloudflare Pages (Git-connected, with wrangler.toml at repo root)
 3. Local development against a local D1 with `wrangler dev`
 
 ### Architecture
@@ -63,7 +63,7 @@ flowchart TB
 3. Rotating Server Secret: Each Worker stores its own random session-signing secret in D1. Changing the password rotates the secret and instantly invalidates all other sessions
 4. Rate Limiting: 10 failed `/auth/login` attempts per IP in 15 minutes triggers a 429. Stored in a TTL'd D1 table
 5. Constant-time Comparisons: PBKDF2 verify uses constant-time `xor` instead of `===` to defeat timing attacks
-6. Static-host Discipline: The whole stack is served from one Worker at one origin, so cookies don't cross domains and CORS isn't a foot-gun
+6. Static-host Discipline: The whole stack is served from one origin, so cookies don't cross domains and CORS isn't a foot-gun
 7. No External Vendors: Your password never leaves your Worker. There's no Auth0 tenant, no Atlas connection string, no third-party JWKS to trust
 8. Strong Password Policy: Setup form requires 12+ chars with upper, lower, number, and a symbol. The Worker re-validates server-side
 
@@ -81,9 +81,9 @@ flowchart TB
 
 1. Public landing with searchable post index and pagination
 2. Single-post view with view + share counters tracked per-day
-3. Cover images served from R2 (custom domain or `r2.dev`)
+3. Cover images served from R2 (custom domain or proxy through `/img`)
 4. Quill output rendered through DOMPurify
-5. Optional newsletter subscribe modal, scoped to your blog
+5. Optional newsletter subscribe modal
 
 #### Admin
 
@@ -101,17 +101,9 @@ flowchart TB
 4. System font stack: Inter / Syne / Jost / Newsreader / JetBrains Mono / Mochiy Pop One
 5. Responsive from 320 px up
 
-#### Keyboard Shortcuts
-
-1. `Tab` inside editor: insert literal tab into content
-2. `Enter` inside link modal: submit
-3. `Escape`: close any open modal or dialog
-4. Right-click an inline image: delete it
-5. `Cmd+K` / `Ctrl+K` (planned)
-
 ### Deployment
 
-#### Cloudflare (one-click)
+#### Cloudflare Workers (recommended — fully auto-provisioning)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fsubratomandalme%2Fdyeink)
 
@@ -122,28 +114,50 @@ flowchart TB
 5. The setup form prompts you for an admin password (12+ chars, mixed case, number, symbol)
 6. You're in — head to the dashboard and start writing
 
-#### Cloudflare (manual via CLI)
+#### Cloudflare Pages (Git-connected)
+
+If you connected the repo to Pages instead of clicking the Workers button, Pages will run `npm run build` from the root, which builds the SPA *and* bundles the Hono Worker into `platform/dist/_worker.js`. Pages uses the `_worker.js` as a catch-all for the site, so the API works on the same origin as the SPA.
+
+D1 and R2 resources are **not** auto-created on Pages. One-time setup:
+
+1. Cloudflare dashboard → D1 → Create database → name `dyeink`
+2. Copy the database_id and paste it into the root `wrangler.toml` under `[[d1_databases]]`
+3. Cloudflare dashboard → R2 → Create bucket → name `dyeink-images`
+4. Apply migrations: `npx wrangler d1 migrations apply dyeink --remote`
+5. Push the updated `wrangler.toml` — Pages picks up the bindings automatically on next deploy
+
+Or skip steps 1-2 by running locally:
+
+```bash
+npx wrangler login
+npx wrangler d1 create dyeink                  # prints the database_id
+npx wrangler r2 bucket create dyeink-images
+npx wrangler d1 migrations apply dyeink --remote
+# Paste the database_id into wrangler.toml, commit, push
+```
+
+#### Manual via CLI (without the deploy button)
 
 ```bash
 git clone https://github.com/subratomandalme/dyeink.git
 cd dyeink
 
-# 1. Install everything
+# Install everything
 cd platform && npm install --legacy-peer-deps && cd ..
 cd backend && npm install && cd ..
 
-# 2. Provision D1 + R2 (one-time)
+# Provision D1 + R2 (one-time)
 cd backend
 npx wrangler login
 npx wrangler d1 create dyeink
-# Paste the database_id into wrangler.toml where it says __REPLACE_ON_FIRST_DEPLOY__
+# Paste the database_id into backend/wrangler.toml at __REPLACE_ON_FIRST_DEPLOY__
 npx wrangler r2 bucket create dyeink-images
 npx wrangler d1 migrations apply dyeink --remote
 
-# 3. Optional: skip the setup wizard by seeding the password as a secret
+# Optional: skip the setup wizard by seeding the password
 npx wrangler secret put APP_PASSWORD
 
-# 4. Deploy
+# Deploy
 npm run deploy
 ```
 
@@ -161,47 +175,45 @@ The repo includes `.github/workflows/deploy.yml`. To enable:
 #### Local Development
 
 ```bash
-# Frontend on :5173 (Vite proxies /api to the worker)
-cd platform && npm run dev
-
-# Worker on :8787 (in a second shell)
+# Worker on :8787 (handles /api + serves built SPA via [assets])
 cd backend
 npx wrangler d1 migrations apply dyeink --local
 npm run dev
-```
 
-For the Vite proxy to land on the Worker, edit `platform/vite.config.ts`'s `server.proxy` target to `http://localhost:8787`. (Default points to `:3000`, a holdover from the old Fastify setup.)
+# Frontend on :5173 (Vite proxies /api and /img to the Worker)
+cd platform && npm run dev
+```
 
 ### Environment Variables
 
-There are *no required* secrets for the Worker — D1 holds the admin password and the session secret. Optional:
+There are *no required* secrets — D1 holds the admin password and the session secret. Optional:
 
 1. `APP_PASSWORD` (optional, secret): If set on first deploy, seeds the admin row directly. If absent, the SPA shows a setup form instead. Either path is supported
 2. `R2_PUBLIC_URL` (optional, secret): If you've attached a custom domain to your R2 bucket, set this so uploaded images return that URL. If unset, images are served back through the Worker at `/img/<key>`
 3. `FRONTEND_ORIGIN` (optional, secret): Pin CORS to a specific origin. Default mirrors the request origin
 
-D1 + R2 binding names live in `backend/wrangler.toml` and are not env vars — `wrangler` reads them directly.
+D1 + R2 binding names live in `wrangler.toml` and are not env vars.
 
 ### Service Setup Guide
 
-#### Cloudflare D1 (auto)
+#### Cloudflare D1
 
 1. The `[[d1_databases]]` block in `wrangler.toml` declares a database named `dyeink`
-2. The Deploy button or `wrangler d1 create dyeink` provisions it
+2. The Workers Deploy button or `npx wrangler d1 create dyeink` provisions it
 3. Migrations under `backend/migrations/` run automatically via `wrangler d1 migrations apply`
 4. Free tier covers 5 GB and 5 M reads/day per account
 
-#### Cloudflare R2 (auto)
+#### Cloudflare R2
 
 1. The `[[r2_buckets]]` block declares `dyeink-images`
-2. The Deploy button or `wrangler r2 bucket create dyeink-images` provisions it
+2. The Workers Deploy button or `npx wrangler r2 bucket create dyeink-images` provisions it
 3. By default, uploaded images are served back through the Worker (`/img/<key>`) — fine for personal use
 4. For a public R2 domain or custom domain, attach it in the R2 dashboard and set `R2_PUBLIC_URL` as a Worker secret
 5. Free tier covers 10 GB storage + zero egress fees inside Cloudflare
 
 #### Cloudflare Custom Domain (optional)
 
-1. Cloudflare dashboard → Workers & Pages → your `dyeink` Worker → Settings → Domains & Routes
+1. Cloudflare dashboard → Workers & Pages → your `dyeink` project → Settings → Domains & Routes
 2. Click Add Custom Domain → enter your domain → Cloudflare creates the DNS records and the SSL cert automatically
 3. No code changes needed; everything keeps working at the new origin
 
