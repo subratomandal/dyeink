@@ -6,7 +6,7 @@ import { useAdminStore } from '@/stores/adminStore'
 import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import DecryptedText from '@/components/common/animations/DecryptedText'
-import Vaso from '@/components/common/effects/Vaso'
+import Grainient from '@/components/common/animations/Grainient'
 import AdminGreeting from './AdminGreeting'
 import NewPostButton from './sidebar/NewPostButton'
 import { cn } from '@/lib/utils'
@@ -145,16 +145,34 @@ export default function AdminLayout() {
 
     return (
         <div className="flex min-h-screen bg-background">
-            <Vaso
-                component="aside"
-                px={0}
-                py={0}
-                depth={1.15}
-                blur={0.55}
-                dispersion={0.28}
-                className="admin-vaso fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]"
-            >
-                <div className="px-5 pb-4 pt-8">
+            <aside className="admin-sidebar-shell fixed z-40 flex h-dvh w-[260px] flex-col border-r bg-card/95 shadow-[1px_0_30px_rgba(0,0,0,0.1)] dark:bg-[#0B0B0B] dark:shadow-[1px_0_30px_rgba(255,255,255,0.08)]">
+                <div className="admin-sidebar-grainient">
+                    <Grainient
+                        color1="#f7f7f7"
+                        color2="#050505"
+                        color3="#8a8a8a"
+                        timeSpeed={0.25}
+                        colorBalance={0}
+                        warpStrength={1}
+                        warpFrequency={5}
+                        warpSpeed={2}
+                        warpAmplitude={50}
+                        blendAngle={0}
+                        blendSoftness={0.05}
+                        rotationAmount={500}
+                        noiseScale={2}
+                        grainAmount={0.1}
+                        grainScale={2}
+                        grainAnimated={false}
+                        contrast={1.5}
+                        gamma={1}
+                        saturation={0}
+                        centerX={0}
+                        centerY={0}
+                        zoom={0.9}
+                    />
+                </div>
+                <div className="admin-sidebar-greeting px-5 pb-4 pt-8">
                     <AdminGreeting name={greetingName} />
                 </div>
 
@@ -200,7 +218,7 @@ export default function AdminLayout() {
                         <span>Sign Out</span>
                     </button>
                 </div>
-            </Vaso>
+            </aside>
 
             <main className="admin-main relative ml-[260px] h-screen flex-1 overflow-hidden bg-background">
                 <div className="absolute right-6 top-6 z-50">
@@ -215,75 +233,41 @@ export default function AdminLayout() {
             </main>
 
             <style>{`
-                .admin-vaso {
+                .admin-sidebar-shell {
                     isolation: isolate;
                     overflow: hidden;
-                    background:
-                        radial-gradient(circle at 14% 0%, color-mix(in srgb, hsl(var(--foreground)) 8%, transparent), transparent 34%),
-                        color-mix(in srgb, hsl(var(--card)) 62%, transparent) !important;
-                    box-shadow:
-                        10px 0 34px rgba(0, 0, 0, 0.13),
-                        inset -1px 0 0 color-mix(in srgb, hsl(var(--foreground)) 14%, transparent),
-                        inset 1px 0 0 color-mix(in srgb, hsl(var(--background)) 62%, transparent) !important;
                 }
-                .admin-vaso [data-vaso] {
-                    border-radius: inherit;
-                    background:
-                        linear-gradient(90deg,
-                            color-mix(in srgb, hsl(var(--foreground)) 7%, transparent),
-                            color-mix(in srgb, hsl(var(--card)) 26%, transparent) 26%,
-                            color-mix(in srgb, hsl(var(--background)) 18%, transparent));
-                    border-right: 1px solid color-mix(in srgb, hsl(var(--foreground)) 16%, transparent);
+                .admin-sidebar-grainient {
+                    position: absolute;
+                    inset: 0;
+                    z-index: 0;
+                    pointer-events: none;
+                    opacity: 0.34;
                 }
-                .admin-vaso [data-vaso]::before,
-                .admin-vaso [data-vaso]::after {
+                .admin-sidebar-grainient::after {
                     content: "";
                     position: absolute;
                     inset: 0;
-                    pointer-events: none;
-                }
-                .admin-vaso [data-vaso]::before {
                     background:
-                        linear-gradient(90deg,
-                            color-mix(in srgb, hsl(var(--foreground)) 14%, transparent) 0,
-                            transparent 8%,
-                            transparent 92%,
-                            color-mix(in srgb, hsl(var(--foreground)) 12%, transparent) 100%),
-                        radial-gradient(90% 20% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 10%, transparent), transparent 72%);
-                    opacity: 0.9;
+                        linear-gradient(180deg, hsl(var(--card) / 0.66), hsl(var(--background) / 0.42)),
+                        radial-gradient(circle at 18% 0%, hsl(var(--foreground) / 0.08), transparent 38%);
                 }
-                .admin-vaso [data-vaso]::after {
+                .dark .admin-sidebar-grainient {
+                    opacity: 0.42;
+                }
+                .dark .admin-sidebar-grainient::after {
                     background:
-                        linear-gradient(116deg, transparent 0%, transparent 38%, color-mix(in srgb, hsl(var(--foreground)) 14%, transparent) 49%, transparent 60%, transparent 100%);
-                    mix-blend-mode: screen;
-                    opacity: 0.34;
-                    animation: admin-vaso-specular 8s ease-in-out infinite alternate;
+                        linear-gradient(180deg, rgb(8 8 8 / 0.48), rgb(8 8 8 / 0.66)),
+                        radial-gradient(circle at 18% 0%, rgb(255 255 255 / 0.08), transparent 38%);
                 }
-                .admin-vaso > :not([data-vaso], svg, canvas) {
+                .admin-sidebar-shell > :not(.admin-sidebar-grainient) {
                     position: relative;
-                    z-index: 2;
-                }
-                @keyframes admin-vaso-specular {
-                    from {
-                        transform: translate3d(-20%, -10%, 0);
-                        opacity: 0.18;
-                    }
-                    to {
-                        transform: translate3d(20%, 10%, 0);
-                        opacity: 0.42;
-                    }
-                }
-                @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-                    .admin-vaso {
-                        background: hsl(var(--card)) !important;
-                    }
-                }
-                @media (prefers-reduced-motion: reduce) {
-                    .admin-vaso [data-vaso]::after {
-                        animation: none !important;
-                    }
+                    z-index: 1;
                 }
                 @media (max-width: 640px) {
+                    .admin-sidebar-grainient {
+                        display: none !important;
+                    }
                     aside {
                         top: auto !important;
                         bottom: 0 !important;
@@ -295,33 +279,11 @@ export default function AdminLayout() {
                         align-items: center !important;
                         border-right: 0 !important;
                         border-top: 1px solid hsl(var(--border)) !important;
-                        border-radius: 22px 22px 0 0 !important;
                         overflow-x: hidden !important;
                         overflow-y: hidden !important;
                         padding: 0 max(0.45rem, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(0.45rem, env(safe-area-inset-left)) !important;
                     }
-                    .admin-vaso {
-                        background:
-                            radial-gradient(100% 120% at 50% 0%, color-mix(in srgb, hsl(var(--foreground)) 8%, transparent), transparent 48%),
-                            color-mix(in srgb, hsl(var(--card)) 60%, transparent) !important;
-                        box-shadow:
-                            0 -10px 30px rgba(0, 0, 0, 0.14),
-                            inset 0 1px 0 color-mix(in srgb, hsl(var(--foreground)) 14%, transparent),
-                            inset 0 -1px 0 color-mix(in srgb, hsl(var(--background)) 60%, transparent) !important;
-                    }
-                    .admin-vaso [data-vaso] {
-                        border-right: 0;
-                        border-top: 1px solid color-mix(in srgb, hsl(var(--foreground)) 15%, transparent);
-                    }
-                    .admin-vaso [data-vaso]::before {
-                        background:
-                            linear-gradient(180deg,
-                                color-mix(in srgb, hsl(var(--foreground)) 14%, transparent) 0,
-                                transparent 8%,
-                                transparent 92%,
-                                color-mix(in srgb, hsl(var(--foreground)) 8%, transparent) 100%);
-                    }
-                    aside > div:first-child,
+                    .admin-sidebar-greeting,
                     aside [data-section-label] { display: none !important; }
                     aside .px-5,
                     aside .pb-6 {
