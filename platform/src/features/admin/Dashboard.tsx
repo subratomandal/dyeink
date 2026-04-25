@@ -73,23 +73,27 @@ export default function Dashboard() {
                     <Stat label="Published" value={dashboardStats.publishedPosts.toString()} />
                 </div>
 
-                <div className="h-[300px] w-full min-w-0">
-                    {!ready || graphData.length === 0 ? (
-                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                            {!ready ? null : 'No stats recorded yet'}
+                <Card className="overflow-hidden shadow-none">
+                    <CardContent className="p-4 sm:p-6">
+                        <div className="h-[300px] w-full min-w-0 overflow-hidden">
+                            {!ready || graphData.length === 0 ? (
+                                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                                    {!ready ? null : 'No stats recorded yet'}
+                                </div>
+                            ) : (
+                                <NativeAreaChart data={graphData} />
+                            )}
                         </div>
-                    ) : (
-                        <NativeAreaChart data={graphData} />
-                    )}
-                </div>
+                    </CardContent>
+                </Card>
             </section>
 
             <div className="mb-8">
-                <h2 className="mb-6 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                 {dashboardStats.latestPost ? (
                     <Link to="/blog" className="block no-underline">
                         <Card className="transition-all hover:border-foreground hover:scale-[1.005]">
                             <CardContent className="p-6">
+                                <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                                 <h3 className="mb-4 font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
                                     {dashboardStats.latestPost.title}
                                 </h3>
@@ -105,12 +109,17 @@ export default function Dashboard() {
                         </Card>
                     </Link>
                 ) : (
-                    <div className="rounded-xl p-6 text-center text-muted-foreground">
-                        No posts yet.{' '}
-                        <Link to="/admin/posts/new" className="text-foreground underline">
-                            Create one?
-                        </Link>
-                    </div>
+                    <Card>
+                        <CardContent className="p-6">
+                            <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
+                            <div className="text-center text-muted-foreground">
+                                No posts yet.{' '}
+                                <Link to="/admin/posts/new" className="text-foreground underline">
+                                    Create one?
+                                </Link>
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
 
@@ -134,7 +143,7 @@ type ChartPoint = {
 function NativeAreaChart({ data }: { data: ChartPoint[] }) {
     const width = 720
     const height = 300
-    const padding = { top: 16, right: 16, bottom: 36, left: 42 }
+    const padding = { top: 20, right: 48, bottom: 44, left: 48 }
     const innerWidth = width - padding.left - padding.right
     const innerHeight = height - padding.top - padding.bottom
     const values = data.flatMap((point) => [point.views || 0, point.shares || 0])
@@ -162,7 +171,7 @@ function NativeAreaChart({ data }: { data: ChartPoint[] }) {
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="h-full w-full overflow-visible"
+            className="block h-full w-full overflow-hidden"
             role="img"
             aria-label="Views and shares over time"
         >
