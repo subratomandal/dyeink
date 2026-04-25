@@ -1,260 +1,156 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { postService } from '../../services/postService'
 import { format } from 'date-fns'
 import { Trash2, Edit2 } from 'lucide-react'
-import { useToast } from '../../components/common/feedback/Toast'
-import PostsSkeleton from '../../components/admin/skeletons/PostsSkeleton'
-import { useAdminStore } from '../../stores/adminStore'
+import { postService } from '@/services/postService'
+import { useAdminStore } from '@/stores/adminStore'
+import { useToast } from '@/components/common/feedback/Toast'
+import PostsSkeleton from '@/components/admin/skeletons/PostsSkeleton'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Spinner } from '@/components/ui/spinner'
+
 export default function Posts() {
     const { posts, postsLoading, deletePostFromCache, fetchPosts } = useAdminStore()
+    const { addToast } = useToast()
+    const [postToDelete, setPostToDelete] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
-
         fetchPosts()
     }, [fetchPosts])
 
     const showLoader = postsLoading && !posts
     const safePosts = posts || []
-    const [showDeleteModal, setShowDeleteModal] = useState(false)
-    const [postToDelete, setPostToDelete] = useState<number | null>(null)
-    const [isDeleting, setIsDeleting] = useState(false)
-    const { addToast } = useToast()
-    const initiateDelete = (id: number) => {
-        setPostToDelete(id)
-        setShowDeleteModal(true)
-    }
+    const filteredPosts = safePosts.filter((post) => post.published)
+
     const confirmDelete = async () => {
         if (!postToDelete) return
         setIsDeleting(true)
         try {
             await postService.deletePost(postToDelete)
             deletePostFromCache(postToDelete)
-            try { addToast({ type: 'success', message: 'Post deleted successfully' }) } catch (e) { }
-            setShowDeleteModal(false)
+            addToast({ type: 'success', message: 'Post deleted successfully' })
+            setPostToDelete(null)
         } catch (error) {
             console.error('Failed to delete post:', error)
-            alert('Failed to delete post.')
+            addToast({ type: 'error', message: 'Failed to delete post.' })
         } finally {
             setIsDeleting(false)
-            setPostToDelete(null)
         }
     }
-    const filteredPosts = safePosts.filter(post => post.published)
-    return (
-        <div style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '4rem', paddingTop: '0' }}>
 
-            <div style={{ marginBottom: '3rem' }}>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)', fontFamily: "'Jost', sans-serif" }}>Published Posts</h1>
-                <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '1.1rem' }}>Manage your live content.</p>
+    return (
+        <div className="mx-auto max-w-5xl pb-16">
+            <div className="mb-12">
+                <h1 className="m-0 font-heading text-4xl font-semibold">Published Posts</h1>
+                <p className="mt-2 text-lg text-muted-foreground">Manage your live content.</p>
             </div>
 
             {showLoader ? (
                 <PostsSkeleton />
             ) : filteredPosts.length === 0 ? (
-                <div className="animate-fade-in" style={{
-                    padding: '4rem',
-                    textAlign: 'center',
-                    border: '1px dashed var(--border-color)',
-                    borderRadius: '4px',
-                    color: 'var(--text-muted)'
-                }}>
+                <div className="animate-fade-in rounded-md border border-dashed border-border p-16 text-center text-muted-foreground">
                     No published posts yet.
                 </div>
             ) : (
-                <div className="animate-fade-in" style={{
-                    borderRadius: '8px',
-                    overflowX: 'auto'
-                }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0', textAlign: 'left' }}>
-                        <thead>
-                            <tr>
-                                <th style={{ padding: '1.25rem 1.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-color)' }}>Title</th>
-                                <th style={{ padding: '1.25rem 1.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-color)' }}>Status</th>
-                                <th style={{ padding: '1.25rem 1.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', borderBottom: '1px solid var(--border-color)' }}>Date</th>
-                                <th style={{ padding: '1.25rem 1.5rem', width: '50px', borderBottom: '1px solid var(--border-color)' }}></th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                <div className="animate-fade-in overflow-x-auto rounded-lg">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-xs font-bold uppercase tracking-wider">Title</TableHead>
+                                <TableHead className="text-xs font-bold uppercase tracking-wider">Status</TableHead>
+                                <TableHead className="text-xs font-bold uppercase tracking-wider">Date</TableHead>
+                                <TableHead className="w-12" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
                             {filteredPosts.map((post) => (
-                                <tr key={post.id} className="hover-row" style={{ transition: 'background 0.2s' }}>
-                                    <td style={{ padding: '1.75rem 1.5rem', verticalAlign: 'middle', maxWidth: '400px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '1.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-                                            <Link to={`/admin/posts/${post.id}/edit`} style={{ color: 'inherit', textDecoration: 'none' }} title={post.title}>
-                                                {post.title}
-                                            </Link>
-                                        </div>
-                                    </td>
-                                    <td style={{ padding: '1.75rem 1.5rem', verticalAlign: 'middle', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                        <span style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            padding: '0.35rem 0.85rem',
-                                            borderRadius: '50px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 700,
-                                            backgroundColor: post.published ? 'rgba(34, 197, 94, 0.1)' : 'rgba(234, 179, 8, 0.1)',
-                                            color: post.published ? '#4ade80' : '#facc15',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                            border: post.published ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(234, 179, 8, 0.2)'
-                                        }}>
+                                <TableRow key={post.id}>
+                                    <TableCell className="py-6 align-middle">
+                                        <Link
+                                            to={`/admin/posts/${post.id}/edit`}
+                                            className="block max-w-xs truncate text-base font-bold text-foreground hover:underline"
+                                            title={post.title}
+                                        >
+                                            {post.title}
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell className="py-6 align-middle">
+                                        <Badge variant={post.published ? 'success' : 'warning'}>
                                             {post.published ? 'Published' : 'Draft'}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '1.75rem 1.5rem', color: 'var(--text-secondary)', fontSize: '0.95rem', verticalAlign: 'middle', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-6 align-middle text-sm text-muted-foreground">
                                         {format(new Date(post.createdAt), 'MMM d, yyyy')}
-                                    </td>
-                                    <td style={{ padding: '1.75rem 1.5rem', textAlign: 'right', verticalAlign: 'middle', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', opacity: 0.7 }}>
-                                            <Link
-                                                to={`/admin/posts/${post.id}/edit`}
-                                                style={{
-                                                    padding: '0.5rem',
-                                                    color: 'var(--text-primary)',
-                                                    borderRadius: '50%',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s',
-                                                    background: 'var(--bg-tertiary)'
-                                                }}
-                                                title="Edit"
+                                    </TableCell>
+                                    <TableCell className="py-6 text-right align-middle">
+                                        <div className="flex justify-end gap-2">
+                                            <Button asChild size="icon" variant="secondary" className="h-8 w-8 rounded-full">
+                                                <Link to={`/admin/posts/${post.id}/edit`} aria-label="Edit">
+                                                    <Edit2 className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
+                                                onClick={() => setPostToDelete(post.id)}
+                                                aria-label="Delete"
                                             >
-                                                <Edit2 size={16} />
-                                            </Link>
-                                            <button
-                                                onClick={() => initiateDelete(post.id)}
-                                                style={{
-                                                    background: 'rgba(239, 68, 68, 0.1)',
-                                                    border: 'none',
-                                                    padding: '0.5rem',
-                                                    color: '#ef4444',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    borderRadius: '50%',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
-                                    </td>
-                                </tr>
+                                    </TableCell>
+                                </TableRow>
                             ))}
-                        </tbody>
-                    </table>
+                        </TableBody>
+                    </Table>
                 </div>
             )}
 
-            {showDeleteModal && (
-                <div className="post-delete-modal-overlay" style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 9999,
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    backdropFilter: 'blur(4px)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    padding: '1rem',
-                    animation: 'fadeIn 0.2s ease-out'
-                }}>
-                    <div className="post-delete-modal-content" style={{
-                        width: '100%',
-                        maxWidth: '400px',
-                        backgroundColor: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '16px',
-                        padding: '2rem',
-                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                        transform: 'translateY(0)',
-                        animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                    }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
-                            Delete this post?
-                        </h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.5, fontSize: '0.95rem' }}>
+            <AlertDialog open={!!postToDelete} onOpenChange={(open) => !open && setPostToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                        <AlertDialogDescription>
                             This action cannot be undone. The post will be permanently removed from your blog.
-                        </p>
-                        <div className="post-delete-actions" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-                            <button
-                                onClick={() => setShowDeleteModal(false)}
-                                disabled={isDeleting}
-                                style={{
-                                    padding: '0.75rem 1.25rem',
-                                    borderRadius: '50px',
-                                    border: '1px solid var(--border-color)',
-                                    background: 'transparent',
-                                    color: 'var(--text-primary)',
-                                    cursor: 'pointer',
-                                    fontWeight: 500,
-                                    fontSize: '0.9rem'
-                                }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                disabled={isDeleting}
-                                style={{
-                                    padding: '0.75rem 1.25rem',
-                                    borderRadius: '50px',
-                                    border: 'none',
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                    fontSize: '0.9rem',
-                                    opacity: isDeleting ? 0.7 : 1,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem'
-                                }}
-                            >
-                                {isDeleting ? 'Deleting...' : 'Delete'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <style>{`
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-                
-                @media (max-width: 480px) {
-                    .post-delete-modal-content {
-                        padding: 1rem !important;
-                        max-width: 260px !important;
-                        margin: auto !important;
-                        border-radius: 12px !important;
-                    }
-                    .post-delete-modal-content h2 {
-                        font-size: 0.95rem !important;
-                        margin-bottom: 0.25rem !important;
-                    }
-                    .post-delete-modal-content p {
-                        font-size: 0.75rem !important;                    margin-bottom: 1rem !important;
-                        line-height: 1.3 !important;
-                    }
-                    .post-delete-actions {
-                        flex-direction: column !important;
-                        gap: 0.4rem !important;
-                    }
-                    .post-delete-actions button {
-                        width: 100% !important;
-                        justify-content: center !important; 
-                        padding: 0.5rem 0.75rem !important;
-                        font-size: 0.8rem !important;                    height: 32px !important;
-                        min-height: 0 !important;
-                        display: flex !important;
-                        align-items: center !important;
-                    }
-                }
-            `}</style>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault()
+                                confirmDelete()
+                            }}
+                            disabled={isDeleting}
+                            className="bg-red-500 text-white hover:bg-red-600"
+                        >
+                            {isDeleting && <Spinner size={16} />}
+                            {isDeleting ? 'Deleting…' : 'Delete'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
-

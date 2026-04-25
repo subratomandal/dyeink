@@ -36,7 +36,7 @@ export default function Landing() {
                     <img src="/Di.png" alt="DyeInk" className="logo-adaptive" style={{ height: '100%', width: '100%', objectFit: 'contain' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', marginTop: '-8px' }}>
-                    <NeumorphismButton to="/register" text="Sign Up" icon={null} />
+                    <NeumorphismButton to="/login" text="Sign In" icon={null} />
                 </div>
             </nav>
 
@@ -78,7 +78,7 @@ export default function Landing() {
                     A minimal, distraction-free publishing platform for writers who value clarity and silence.
                 </p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                    <NeumorphismButton to="/register" text="Create your blog" icon={null} />
+                    <NeumorphismButton to="/blog" text="Read the blog" icon={null} />
                 </div>
             </main>
 

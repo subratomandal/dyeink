@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { postService } from '../../services/postService'
 import {
     ChevronLeft,
     Undo,
@@ -8,7 +7,6 @@ import {
     Bold,
     Italic,
     Underline,
-
     List,
     ListOrdered,
     AlignLeft,
@@ -17,104 +15,119 @@ import {
     Link as LinkIcon,
     Image as ImageIcon,
     Quote,
+    Trash2,
 } from 'lucide-react'
-import EditorSkeleton from '../../components/admin/skeletons/EditorSkeleton'
-import DecryptedText from '../../components/common/animations/DecryptedText'
-import { useThemeStore } from '../../stores/themeStore'
-import { useAuthStore } from '../../stores/authStore'
-import { useAdminStore } from '../../stores/adminStore'
-import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
+import { postService } from '@/services/postService'
+import EditorSkeleton from '@/components/admin/skeletons/EditorSkeleton'
+import DecryptedText from '@/components/common/animations/DecryptedText'
+import { useAuthStore } from '@/stores/authStore'
+import { useAdminStore } from '@/stores/adminStore'
+// useAdminStore used for fetchPosts(true) on save
+import { useLockBodyScroll } from '@/hooks/useLockBodyScroll'
+import { useToast } from '@/components/common/feedback/Toast'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Spinner } from '@/components/ui/spinner'
+import { Separator } from '@/components/ui/separator'
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
-interface ModalConfig {
-    isOpen: boolean;
-    type: 'link' | null;
-    inputValue: string;
+interface LinkModalProps {
+    open: boolean
+    value: string
+    onClose: () => void
+    onConfirm: () => void
+    onChange: (value: string) => void
 }
 
-interface EditorInputModalProps {
-    config: ModalConfig;
-    onClose: () => void;
-    onConfirm: () => void;
-    onChange: (value: string) => void;
-}
-
-function EditorInputModal({ config, onClose, onConfirm, onChange }: EditorInputModalProps) {
-    if (!config.isOpen) return null;
-
+function LinkModal({ open, value, onClose, onConfirm, onChange }: LinkModalProps) {
     return (
-        <div className="editor-modal-overlay">
-            <div className="editor-modal">
-                <h3>Insert Link</h3>
-                <input
-                    type="text"
-                    placeholder="https://example.com"
-                    value={config.inputValue}
-                    onChange={(e) => onChange(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') onConfirm();
-                        if (e.key === 'Escape') onClose();
-                    }}
-                    autoFocus
-                />
-                <div className="editor-modal-actions">
-                    <button onClick={onClose} className="btn-cancel">Cancel</button>
-                    <button onClick={onConfirm} className="btn-confirm">Confirm</button>
+        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Insert Link</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-2">
+                    <Label htmlFor="link-url">URL</Label>
+                    <Input
+                        id="link-url"
+                        type="url"
+                        placeholder="https://example.com"
+                        value={value}
+                        autoFocus
+                        onChange={(e) => onChange(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') onConfirm()
+                            if (e.key === 'Escape') onClose()
+                        }}
+                    />
                 </div>
-            </div>
-        </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={onConfirm}>Confirm</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }
 
-interface ImageContextMenuProps {
-    visible: boolean;
-    x: number;
-    y: number;
-    onDelete: () => void;
+function ToolbarButton({
+    onClick,
+    title,
+    children,
+}: {
+    onClick: () => void
+    title: string
+    children: React.ReactNode
+}) {
+    return (
+        <button
+            type="button"
+            title={title}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onClick}
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+            {children}
+        </button>
+    )
 }
 
-function ImageContextMenu({ visible, x, y, onDelete }: ImageContextMenuProps) {
-    if (!visible) return null;
+function ToolbarDivider() {
+    return <Separator orientation="vertical" className="mx-1 h-5" />
+}
+
+function PublishingScreen() {
+    useLockBodyScroll()
     return (
-        <div
-            className="image-context-menu"
-            style={{
-                position: 'fixed',
-                top: y,
-                left: x,
-                zIndex: 10000,
-                backgroundColor: 'var(--bg-elevated)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                padding: '0.5rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                animation: 'fadeIn 0.1s ease-out'
-            }}
-            onClick={(e) => e.stopPropagation()}
-        >
-            <button
-                onClick={onDelete}
-                style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#ef4444',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    width: '100%'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                    Delete Image
-                </div>
-            </button>
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background text-foreground">
+            <div className="font-mono text-3xl font-semibold">
+                <DecryptedText
+                    text="Publishing..."
+                    speed={80}
+                    maxIterations={30}
+                    animateOn="view"
+                    revealDirection="center"
+                />
+            </div>
+            <div className="mt-4 font-mono text-sm opacity-50">
+                <DecryptedText
+                    text="PLEASE WAIT"
+                    speed={50}
+                    maxIterations={15}
+                    animateOn="view"
+                    revealDirection="end"
+                />
+            </div>
         </div>
     )
 }
@@ -123,8 +136,8 @@ export default function Editor() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const { logout } = useAuthStore()
-    const { theme } = useThemeStore()
-    const { settings } = useAdminStore()
+    const { addToast } = useToast()
+
     const [title, setTitle] = useState('')
     const [excerpt, setExcerpt] = useState('')
     const [coverImage, setCoverImage] = useState('')
@@ -132,30 +145,25 @@ export default function Editor() {
     const [saving, setSaving] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
     const [lastSaved, setLastSaved] = useState<Date | null>(null)
-    const [isContinueHovered, setIsContinueHovered] = useState(false)
-    const [isBackHovered, setIsBackHovered] = useState(false)
     const [initialContent, setInitialContent] = useState('')
 
-
-    const [modalConfig, setModalConfig] = useState<{
-        isOpen: boolean;
-        type: 'link' | null;
-        inputValue: string;
-    }>({ isOpen: false, type: null, inputValue: '' });
-
-
+    const [linkModalOpen, setLinkModalOpen] = useState(false)
+    const [linkValue, setLinkValue] = useState('')
     const [contextMenu, setContextMenu] = useState<{
-        visible: boolean;
-        x: number;
-        y: number;
-        target: HTMLImageElement | null;
-    }>({ visible: false, x: 0, y: 0, target: null });
+        visible: boolean
+        x: number
+        y: number
+        target: HTMLImageElement | null
+    }>({ visible: false, x: 0, y: 0, target: null })
 
-    const savedSelection = useRef<Range | null>(null);
+    const savedSelection = useRef<Range | null>(null)
+    const contentRef = useRef<HTMLDivElement>(null)
+    const titleRef = useRef<HTMLDivElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         if (!id) return
-        const fetchPost = async () => {
+        const load = async () => {
             setLoading(true)
             try {
                 const post = await postService.getPostById(id)
@@ -165,455 +173,320 @@ export default function Editor() {
                     setCoverImage(post.coverImage || '')
                     setInitialContent(post.content || '')
                 }
-            } catch (error) {
-                console.error('Failed to load post:', error)
+            } catch (e) {
+                console.error('Failed to load post:', e)
             } finally {
                 setLoading(false)
             }
         }
-        fetchPost()
-        fetchPost()
+        load()
     }, [id])
 
+    useEffect(() => {
+        const handleClick = () => setContextMenu((prev) => ({ ...prev, visible: false }))
+        document.addEventListener('click', handleClick)
+        return () => document.removeEventListener('click', handleClick)
+    }, [])
 
     useEffect(() => {
-        const handleClick = () => setContextMenu(prev => ({ ...prev, visible: false }));
-        document.addEventListener('click', handleClick);
-        return () => document.removeEventListener('click', handleClick);
-    }, []);
+        if (!loading && titleRef.current && contentRef.current) {
+            if (titleRef.current.innerText.trim() === '') titleRef.current.innerText = title
+            if (contentRef.current.innerHTML.trim() === '') contentRef.current.innerHTML = initialContent
+        }
+    }, [loading, initialContent, title])
+
+    const executeCommand = (command: string, value?: string) => document.execCommand(command, false, value)
+
+    const saveSelection = () => {
+        const selection = window.getSelection()
+        savedSelection.current =
+            selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+    }
+    const restoreSelection = () => {
+        const selection = window.getSelection()
+        if (selection && savedSelection.current) {
+            selection.removeAllRanges()
+            selection.addRange(savedSelection.current)
+        }
+    }
 
     const handleContextMenu = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).tagName === 'IMG') {
-            e.preventDefault();
+            e.preventDefault()
             setContextMenu({
                 visible: true,
                 x: e.clientX,
                 y: e.clientY,
-                target: e.target as HTMLImageElement
-            });
+                target: e.target as HTMLImageElement,
+            })
         }
-    };
+    }
 
     const handleDeleteImage = () => {
         if (contextMenu.target) {
-            contextMenu.target.remove();
-            setContextMenu(prev => ({ ...prev, visible: false }));
-
-            if (contentRef.current) {
-                contentRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-            }
+            contextMenu.target.remove()
+            setContextMenu((prev) => ({ ...prev, visible: false }))
+            contentRef.current?.dispatchEvent(new Event('input', { bubbles: true }))
         }
-    };
+    }
 
     const handleContentClick = (e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
+        const target = e.target as HTMLElement
         if (target.tagName === 'IMG') {
-            const selection = window.getSelection();
-            if (!selection) return;
-            const range = document.createRange();
-            range.setStartAfter(target);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
-    };
-
-
-    useEffect(() => {
-        if (!loading && titleRef.current && contentRef.current) {
-
-            if (titleRef.current.innerText.trim() === '') {
-                titleRef.current.innerText = title
-            }
-
-            if (contentRef.current.innerHTML.trim() === '') {
-                contentRef.current.innerHTML = initialContent
-            }
-        }
-
-    }, [loading, initialContent])
-    const contentRef = useRef<HTMLDivElement>(null)
-    const titleRef = useRef<HTMLDivElement>(null)
-    const executeCommand = (command: string, value: string | undefined = undefined) => {
-        document.execCommand(command, false, value)
-    }
-
-    const saveSelection = () => {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-            savedSelection.current = selection.getRangeAt(0);
-        } else {
-            savedSelection.current = null;
+            const sel = window.getSelection()
+            if (!sel) return
+            const range = document.createRange()
+            range.setStartAfter(target)
+            range.collapse(true)
+            sel.removeAllRanges()
+            sel.addRange(range)
         }
     }
-
-    const restoreSelection = () => {
-        const selection = window.getSelection();
-        if (selection && savedSelection.current) {
-            selection.removeAllRanges();
-            selection.addRange(savedSelection.current);
-        }
-    }
-
-    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-
         try {
-
             const url = await postService.uploadImage(file)
             if (url) {
                 restoreSelection()
-
-                setTimeout(() => {
-
-                    executeCommand('insertHTML', `<p><br></p><img src="${url}" alt="Uploaded image" /><p><br></p>`)
-                }, 50)
+                setTimeout(
+                    () =>
+                        executeCommand(
+                            'insertHTML',
+                            `<p><br></p><img src="${url}" alt="Uploaded image" /><p><br></p>`,
+                        ),
+                    50,
+                )
             } else {
-                alert('Failed to upload image')
+                addToast({ type: 'error', message: 'Failed to upload image' })
             }
-        } catch (error) {
-            console.error('Image upload failed:', error)
-            alert('Image upload failed')
+        } catch (err) {
+            addToast({ type: 'error', message: 'Image upload failed' })
         } finally {
-
             if (fileInputRef.current) fileInputRef.current.value = ''
         }
     }
 
     const handleLink = () => {
-        saveSelection();
-        setModalConfig({ isOpen: true, type: 'link', inputValue: '' });
+        saveSelection()
+        setLinkValue('')
+        setLinkModalOpen(true)
     }
 
     const handleImage = () => {
-        saveSelection();
-
+        saveSelection()
         fileInputRef.current?.click()
     }
 
-    const handleModalClose = () => {
-        setModalConfig({ isOpen: false, type: null, inputValue: '' });
-
+    const handleLinkConfirm = () => {
+        setLinkModalOpen(false)
         setTimeout(() => {
-            contentRef.current?.focus();
-            if (savedSelection.current) restoreSelection();
-        }, 0);
+            restoreSelection()
+            if (linkValue) executeCommand('createLink', linkValue)
+        }, 10)
     }
 
-    const handleModalConfirm = () => {
-        const { type, inputValue } = modalConfig;
-
-
-
-        setTimeout(() => {
-            restoreSelection();
-            if (type === 'link') {
-                if (inputValue) executeCommand('createLink', inputValue);
-            }
-        }, 10);
-    }
-    const handleSave = async (shouldPublish: boolean = false) => {
-        if (!title) {
-            alert("Please enter a title")
+    const handleSave = async (shouldPublish = false) => {
+        if (!title.trim()) {
+            addToast({ type: 'error', message: 'Please enter a title' })
             return
         }
-        if (shouldPublish) {
-            setIsPublishing(true)
-        } else {
-            setSaving(true)
-        }
+        if (shouldPublish) setIsPublishing(true)
+        else setSaving(true)
+
         try {
             const contentHtml = contentRef.current?.innerHTML || ''
             const [result] = await Promise.all([
                 id
-                    ? postService.updatePost(parseInt(id), {
-                        title,
-                        content: contentHtml,
-                        excerpt,
-                        coverImage: coverImage || '',
-                        published: shouldPublish
-                    })
+                    ? postService.updatePost(id, {
+                          title,
+                          content: contentHtml,
+                          excerpt,
+                          coverImage: coverImage || '',
+                          published: shouldPublish,
+                      })
                     : postService.createPost({
-                        title,
-                        content: contentHtml,
-                        excerpt,
-                        coverImage: coverImage || '',
-                        published: shouldPublish
-                    }),
-                shouldPublish ? new Promise(resolve => setTimeout(resolve, 3000)) : Promise.resolve()
+                          title,
+                          content: contentHtml,
+                          excerpt,
+                          coverImage: coverImage || '',
+                          published: shouldPublish,
+                      }),
+                shouldPublish ? new Promise((resolve) => setTimeout(resolve, 3000)) : Promise.resolve(),
             ])
-            setLastSaved(new Date())
 
+            setLastSaved(new Date())
             await useAdminStore.getState().fetchPosts(true)
 
             if (shouldPublish && result) {
-                const subdomain = settings?.subdomain || 'blog'
-                navigate(`/${subdomain}/${result.slug}`)
+                navigate(`/blog/${result.slug}`)
             }
-        } catch (error) {
-            console.error('Failed to save post:', error)
-            const msg = (error as Error).message
-            if (msg.includes('User not authenticated') || msg.includes('row-level security')) {
-                alert('Session expired. Redirecting to login...')
+        } catch (error: any) {
+            const msg = error?.message || 'Failed to save post'
+            if (msg.includes('User not authenticated') || msg.includes('Unauthorized')) {
+                addToast({ type: 'error', message: 'Session expired. Redirecting…' })
                 await logout()
                 navigate('/login')
-            } else if (msg.includes('posts_slug_key') || msg.includes('duplicate key')) {
-                alert('Duplicate title: A post with this title already exists. Please choose a different title.')
+            } else if (msg.includes('duplicate') || msg.includes('slug')) {
+                addToast({
+                    type: 'error',
+                    message: 'A post with this title already exists. Choose a different title.',
+                })
             } else {
-                alert(`Failed to save post: ${msg}`)
+                addToast({ type: 'error', message: msg })
             }
             setIsPublishing(false)
         } finally {
             setSaving(false)
         }
     }
-    if (loading) {
-        return <EditorSkeleton />
-    }
 
-    function PublishingScreen() {
-        useLockBodyScroll()
-        return (
-            <div style={{
-                position: 'fixed',
-                inset: 0,
-                zIndex: 9999,
-                backgroundColor: 'var(--bg-primary)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-primary)'
-            }}>
-                <div style={{ fontSize: '2rem', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    <DecryptedText
-                        text="Publishing..."
-                        speed={80}
-                        maxIterations={30}
-                        animateOn="view"
-                        revealDirection="center"
-                    />
-                </div>
-                <div style={{ marginTop: '1rem', opacity: 0.5, fontSize: '0.9rem', fontFamily: 'var(--font-mono)' }}>
-                    <DecryptedText
-                        text="PLEASE WAIT"
-                        speed={50}
-                        maxIterations={15}
-                        animateOn="view"
-                        revealDirection="end"
-                    />
-                </div>
-            </div>
-        )
-    }
-
-    if (isPublishing) {
-        return <PublishingScreen />
-    }
-
-
+    if (loading) return <EditorSkeleton />
+    if (isPublishing) return <PublishingScreen />
 
     return (
-        <div className="editor-page" style={{
-            color: 'var(--text-primary)',
-            fontFamily: "'Roboto', sans-serif"
-        }}>
+        <div className="editor-page text-foreground">
             <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
                 accept="image/*"
-                style={{ display: 'none' }}
-            />
-            <EditorInputModal
-                config={modalConfig}
-                onClose={handleModalClose}
-                onConfirm={handleModalConfirm}
-                onChange={(val) => setModalConfig(prev => ({ ...prev, inputValue: val }))}
+                className="hidden"
             />
 
-            <ImageContextMenu
-                visible={contextMenu.visible}
-                x={contextMenu.x}
-                y={contextMenu.y}
-                onDelete={handleDeleteImage}
+            <LinkModal
+                open={linkModalOpen}
+                value={linkValue}
+                onClose={() => setLinkModalOpen(false)}
+                onConfirm={handleLinkConfirm}
+                onChange={setLinkValue}
             />
 
-            <nav style={{
-                position: 'sticky',
-                top: 0,
-                backgroundColor: 'var(--bg-primary)',
-                borderBottom: '1px solid var(--border-color)',
-                padding: '0.75rem 1.5rem',
-                display: 'grid',
-                gridTemplateColumns: '1fr auto 1fr',
-                alignItems: 'center',
-                zIndex: 50
-            }}>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {contextMenu.visible && (
+                <div
+                    className="fixed z-[10000] rounded-md border bg-popover p-1 shadow-md"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <button
-                        onClick={() => navigate(-1)}
-                        onMouseEnter={() => setIsBackHovered(true)}
-                        onMouseLeave={() => setIsBackHovered(false)}
-                        style={{
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '50%',
-                            width: '40px',
-                            height: '40px',
-                            cursor: 'pointer',
-                            color: 'var(--text-primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.3s ease',
-                            paddingRight: '3px',
-                            boxShadow: isBackHovered
-                                ? (theme === 'dark' ? '0 0 15px rgba(255, 255, 255, 0.3)' : '0 0 15px rgba(0, 0, 0, 0.15)')
-                                : 'none',
-                            transform: isBackHovered ? 'scale(1.05)' : 'scale(1)'
-                        }}
+                        onClick={handleDeleteImage}
+                        className="flex w-full items-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/10"
                     >
-                        <ChevronLeft size={20} />
+                        <Trash2 className="h-4 w-4" /> Delete Image
                     </button>
+                </div>
+            )}
+
+            <nav className="sticky top-0 z-50 grid grid-cols-[1fr_auto_1fr] items-center border-b bg-background px-6 py-3">
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => navigate(-1)}
+                        className="h-10 w-10 rounded-full"
+                    >
+                        <ChevronLeft className="h-5 w-5" />
+                    </Button>
                     {lastSaved && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                             Saved
                         </div>
                     )}
                 </div>
 
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    color: 'var(--text-secondary)',
-                    overflowX: 'auto',
-                    scrollbarWidth: 'none',
-                    paddingRight: '1rem',
-
-                }}>
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('undo')} className="toolbar-btn" title="Undo"><Undo size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('redo')} className="toolbar-btn" title="Redo"><Redo size={18} /></button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('bold')} className="toolbar-btn" title="Bold"><Bold size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('italic')} className="toolbar-btn" title="Italic"><Italic size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('underline')} className="toolbar-btn" title="Underline"><Underline size={18} /></button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-
-
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('insertUnorderedList')} className="toolbar-btn" title="Bullet List"><List size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('insertOrderedList')} className="toolbar-btn" title="Numbered List"><ListOrdered size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('formatBlock', 'blockquote')} className="toolbar-btn" title="Quote"><Quote size={18} /></button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('justifyLeft')} className="toolbar-btn" title="Align Left"><AlignLeft size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('justifyCenter')} className="toolbar-btn" title="Align Center"><AlignCenter size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => executeCommand('justifyRight')} className="toolbar-btn" title="Align Right"><AlignRight size={18} /></button>
-                    </div>
-
-                    <div className="toolbar-divider" />
-
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleLink} className="toolbar-btn" title="Link"><LinkIcon size={18} /></button>
-                        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={handleImage} className="toolbar-btn" title="Image"><ImageIcon size={18} /></button>
-                    </div>
+                <div className="flex items-center gap-1 overflow-x-auto pr-4 [scrollbar-width:none] [-ms-overflow-style:none]">
+                    <ToolbarButton onClick={() => executeCommand('undo')} title="Undo">
+                        <Undo className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton onClick={() => executeCommand('redo')} title="Redo">
+                        <Redo className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarDivider />
+                    <ToolbarButton onClick={() => executeCommand('bold')} title="Bold">
+                        <Bold className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton onClick={() => executeCommand('italic')} title="Italic">
+                        <Italic className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton onClick={() => executeCommand('underline')} title="Underline">
+                        <Underline className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarDivider />
+                    <ToolbarButton
+                        onClick={() => executeCommand('insertUnorderedList')}
+                        title="Bullet List"
+                    >
+                        <List className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => executeCommand('insertOrderedList')}
+                        title="Numbered List"
+                    >
+                        <ListOrdered className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => executeCommand('formatBlock', 'blockquote')}
+                        title="Quote"
+                    >
+                        <Quote className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarDivider />
+                    <ToolbarButton onClick={() => executeCommand('justifyLeft')} title="Align Left">
+                        <AlignLeft className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton onClick={() => executeCommand('justifyCenter')} title="Align Center">
+                        <AlignCenter className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton onClick={() => executeCommand('justifyRight')} title="Align Right">
+                        <AlignRight className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarDivider />
+                    <ToolbarButton onClick={handleLink} title="Link">
+                        <LinkIcon className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton onClick={handleImage} title="Image">
+                        <ImageIcon className="h-4 w-4" />
+                    </ToolbarButton>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '1rem' }}>
-
-                    <button
+                <div className="flex items-center justify-end gap-3">
+                    <Button
                         onClick={() => handleSave(true)}
-                        onMouseEnter={() => setIsContinueHovered(true)}
-                        onMouseLeave={() => setIsContinueHovered(false)}
                         disabled={saving}
-                        style={{
-                            background: theme === 'dark' ? '#ffffff' : '#000000',
-                            color: theme === 'dark' ? '#000000' : '#ffffff',
-                            border: 'none',
-                            padding: '0.6rem 1.8rem',
-                            borderRadius: '50px',
-                            fontSize: '0.9rem',
-                            fontWeight: 700,
-                            letterSpacing: '0.02em',
-                            cursor: saving ? 'not-allowed' : 'pointer',
-                            opacity: saving ? 0.7 : 1,
-                            transition: 'all 0.3s ease',
-                            boxShadow: isContinueHovered && !saving
-                                ? (theme === 'dark'
-                                    ? '0 0 20px rgba(255, 255, 255, 0.4), 0 0 10px rgba(255, 255, 255, 0.2)'
-                                    : '0 0 20px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 0, 0, 0.1)')
-                                : 'none'
-                        }}
+                        className="rounded-full px-7"
                     >
-                        {saving ? 'Publishing...' : 'Continue'}
-                    </button>
+                        {saving && <Spinner size={16} />}
+                        {saving ? 'Publishing…' : 'Continue'}
+                    </Button>
                 </div>
             </nav>
 
-            <div style={{ maxWidth: '720px', margin: '0 auto', padding: '5rem 1.5rem 3rem 1.5rem' }}>
+            <div className="mx-auto max-w-[720px] px-6 pb-12 pt-20">
                 <div
                     ref={titleRef}
                     contentEditable
-                    className="editor-title-editable"
+                    className={cn(
+                        'editor-title-editable mb-4 w-full bg-transparent text-[3.5rem] font-bold leading-tight text-foreground outline-none',
+                    )}
                     data-placeholder="Title"
                     onInput={(e) => setTitle(e.currentTarget.innerText)}
                     onPaste={(e) => {
-                        e.preventDefault();
-                        const text = e.clipboardData.getData('text/plain');
-                        document.execCommand('insertText', false, text);
+                        e.preventDefault()
+                        const text = e.clipboardData.getData('text/plain')
+                        document.execCommand('insertText', false, text)
                     }}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault()
-                        }
-                    }}
-                    style={{
-                        width: '100%',
-                        outline: 'none',
-                        fontSize: '3.5rem',
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                        marginBottom: '1rem',
-                        background: 'transparent',
-                        fontFamily: 'inherit',
-                        lineHeight: '1.2'
+                        if (e.key === 'Enter') e.preventDefault()
                     }}
                 />
 
                 <div
                     ref={contentRef}
                     contentEditable
-                    className="editor-content-editable"
+                    className="editor-content-editable min-h-[60vh] w-full whitespace-pre-wrap bg-transparent text-lg leading-relaxed text-foreground outline-none"
                     data-placeholder="Start writing..."
-                    style={{
-                        width: '100%',
-                        minHeight: '60vh',
-                        outline: 'none',
-                        fontSize: '1.2rem',
-                        lineHeight: '1.6',
-                        color: 'var(--text-primary)',
-                        background: 'transparent',
-                        fontFamily: 'inherit',
-                        whiteSpace: 'pre-wrap'
-                    }}
                     onContextMenu={handleContextMenu}
                     onClick={handleContentClick}
                     onKeyDown={(e) => {
@@ -624,44 +497,15 @@ export default function Editor() {
                     }}
                 />
             </div>
+
             <style>{`
-                .editor-content-editable:empty:before,
-                .editor-title-editable:empty:before {
+                .editor-title-editable:empty:before,
+                .editor-content-editable:empty:before {
                     content: attr(data-placeholder);
-                    color: var(--text-muted);
+                    color: hsl(var(--muted-foreground));
                     pointer-events: none;
                 }
-                .editor-title-editable {
-                    transition: opacity 0.3s ease;
-                }
-                .editor-title-editable:empty:before {
-                    font-size: 3.5rem; 
-                    font-weight: 700;
-                    opacity: 0.3;
-                }
-                .toolbar-btn {
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    color: inherit;
-                    padding: 0.4rem;
-                    border-radius: 6px;
-                    transition: all 0.2s;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .toolbar-btn:hover {
-                    background: var(--bg-secondary);
-                    color: var(--text-primary);
-                }
-                .toolbar-divider {
-                    width: 1px;
-                    height: 20px;
-                    background-color: var(--border-color);
-                    margin: 0 0.25rem;
-                }
-
+                .editor-title-editable:empty:before { font-size: 3.5rem; font-weight: 700; opacity: 0.35; }
                 .editor-content-editable h1 { font-size: 2.5em; margin: 0.67em 0; font-weight: 700; line-height: 1.2; }
                 .editor-content-editable h2 { font-size: 2em; margin: 0.75em 0; font-weight: 600; line-height: 1.3; }
                 .editor-content-editable h3 { font-size: 1.5em; margin: 0.83em 0; font-weight: 600; line-height: 1.4; }
@@ -669,141 +513,18 @@ export default function Editor() {
                 .editor-content-editable ul { list-style-type: disc; padding-left: 1.5em; margin: 1em 0; }
                 .editor-content-editable ol { list-style-type: decimal; padding-left: 1.5em; margin: 1em 0; }
                 .editor-content-editable blockquote {
-                    border-left: 4px solid var(--border-color);
-                    padding-left: 1rem;
-                    margin: 1rem 0;
-                    font-style: italic;
-                    color: var(--text-secondary);
+                    border-left: 4px solid hsl(var(--border));
+                    padding-left: 1rem; margin: 1rem 0; font-style: italic;
+                    color: hsl(var(--muted-foreground));
                 }
-                .editor-content-editable img {
-                    max-width: 100% !important;
-                    height: auto !important;
-                    border-radius: 8px;
-                    margin: 1rem 0;
-                    display: block;
-                }
-                .editor-content-editable a {
-                    color: var(--accent-primary);
-                    text-decoration: underline;
-                }
-
-                @media (max-width: 499px) {
-                    .editor-page nav {
-                        padding: 0.75rem 1rem !important;
-                        grid-template-columns: auto 1fr auto !important;
-                        gap: 1rem;
-                    }
-                    .editor-page nav > div:first-child button {
-                        width: 36px !important;
-                        height: 36px !important;
-                    }
-                    .editor-page nav > div:nth-child(2) {
-                        display: flex !important;
-                        justify-content: flex-start !important;
-                        align-items: center !important;
-                        overflow-x: auto !important;
-                        width: 100%;
-                        -webkit-overflow-scrolling: touch;
-                    }
-                    .editor-page nav > div:last-child button {
-                        padding: 0.6rem 1rem !important;
-                        font-size: 0.9rem !important;
-                    }
-                    .editor-title-editable {
-                        font-size: 2rem !important;
-                    }
-                    .editor-title-editable:empty:before {
-                        font-size: 2rem !important;
-                    }
-                    .editor-content-editable {
-                        font-size: 1rem !important;
-                        min-height: 50vh !important;
-                        padding-bottom: 200px !important;
-                    }
-                    .editor-page > div:last-of-type {
-                        padding: 2rem 1rem 2rem 1rem !important;
-                    }
-                }
-
-
-                .editor-modal-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(0, 0, 0, 0.5);
-                    backdrop-filter: blur(4px);
-                    z-index: 1000;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 1rem;
-                }
-                .editor-modal {
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border-color);
-                    padding: 1.5rem;
-                    border-radius: 12px;
-                    width: 100%;
-                    max-width: 400px;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                    animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-                }
-                .editor-modal h3 {
-                    margin: 0 0 1rem 0;
-                    font-size: 1.2rem;
-                    font-weight: 600;
-                }
-                .editor-modal input {
-                    width: 100%;
-                    padding: 0.75rem;
-                    border-radius: 8px;
-                    border: 1px solid var(--border-color);
-                    background: var(--bg-primary);
-                    color: var(--text-primary);
-                    font-size: 1rem;
-                    margin-bottom: 1.5rem;
-                    outline: none;
-                    transition: border-color 0.2s;
-                }
-                .editor-modal input:focus {
-                    border-color: var(--accent-primary, #0070f3);
-                }
-                .editor-modal-actions {
-                    display: flex;
-                    justify-content: flex-end;
-                    gap: 0.75rem;
-                }
-                .editor-modal button {
-                    padding: 0.5rem 1rem;
-                    border-radius: 6px;
-                    font-size: 0.9rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .btn-cancel {
-                    background: transparent;
-                    border: 1px solid var(--border-color);
-                    color: var(--text-secondary);
-                }
-                .btn-cancel:hover {
-                    background: var(--bg-tertiary, #f3f4f6);
-                    color: var(--text-primary);
-                }
-                .btn-confirm {
-                    background: var(--text-primary);
-                    color: var(--bg-primary);
-                    border: 1px solid var(--text-primary);
-                }
-                .btn-confirm:hover {
-                    opacity: 0.9;
-                    transform: translateY(-1px);
-                }
-                @keyframes modalPop {
-                    from { opacity: 0; transform: scale(0.95) translateY(10px); }
-                    to { opacity: 1; transform: scale(1) translateY(0); }
+                .editor-content-editable img { max-width: 100% !important; height: auto !important; border-radius: 0.5rem; margin: 1rem 0; display: block; }
+                .editor-content-editable a { color: hsl(var(--foreground)); text-decoration: underline; }
+                @media (max-width: 640px) {
+                    .editor-title-editable { font-size: 2rem !important; }
+                    .editor-title-editable:empty:before { font-size: 2rem !important; }
+                    .editor-content-editable { font-size: 1rem !important; min-height: 50vh !important; padding-bottom: 200px !important; }
                 }
             `}</style>
         </div>
     )
 }
-

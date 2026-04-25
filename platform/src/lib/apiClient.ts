@@ -1,45 +1,23 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { getAccessToken, logout as auth0Logout } from './auth0';
+import axios, { AxiosInstance } from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+    baseURL: API_BASE_URL,
+    withCredentials: true, // session cookie is HTTPOnly + same-origin in prod
+    headers: { 'Content-Type': 'application/json' },
+})
 
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (error) {
-      console.error('Error getting access token:', error);
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor to handle auth errors
+// Surface 401s to the auth store via a custom event. App.tsx subscribes and
+// flips the store to unauthenticated; the router redirects to /login.
 apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      try {
-        await auth0Logout();
-      } catch (logoutError) {
-        console.error('Logout error:', logoutError);
-      }
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+        }
+        return Promise.reject(error)
+    },
+)
 
-export default apiClient;
+export default apiClient

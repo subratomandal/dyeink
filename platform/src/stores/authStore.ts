@@ -1,190 +1,87 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import auth0Client, {
-  getAuth0Client,
-  getUser as getAuth0User,
-  getAccessToken,
-  logout as auth0Logout,
-  handleRedirectCallback,
-} from '../lib/auth0';
-import apiClient from '../lib/apiClient';
-
-export interface User {
-  id: string;
-  auth0Id: string;
-  email: string;
-  name: string;
-  picture?: string;
-  isAdmin: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import { create } from 'zustand'
+import apiClient from '@/lib/apiClient'
 
 interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  accessToken: string | null;
-  setUser: (user: User | null) => void;
-  setAccessToken: (token: string | null) => void;
-  logout: () => Promise<void>;
-  initialize: () => Promise<void>;
-  login: (options?: { connection?: string }) => Promise<void>;
-  signup: () => Promise<void>;
-  refreshToken: () => Promise<string | null>;
+    isAuthenticated: boolean
+    isLoading: boolean
+    needsSetup: boolean
+    name: string
+    email: string
+    initialize: () => Promise<void>
+    login: (password: string) => Promise<void>
+    setup: (password: string) => Promise<void>
+    logout: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
-      isLoading: true,
-      accessToken: null,
+export const useAuthStore = create<AuthState>((set) => ({
+    isAuthenticated: false,
+    isLoading: true,
+    needsSetup: false,
+    name: '',
+    email: '',
 
-      setUser: (user) => {
-        set({ user, isAuthenticated: !!user });
-      },
-
-      setAccessToken: (token) => {
-        set({ accessToken: token });
-      },
-
-      login: async (options) => {
-        await auth0Client.login(options);
-      },
-
-      signup: async () => {
-        await auth0Client.signup();
-      },
-
-      logout: async () => {
+    initialize: async () => {
+        set({ isLoading: true })
         try {
-          await auth0Logout();
-        } catch (error) {
-          console.error('Logout error:', error);
-        }
-        set({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          accessToken: null,
-        });
-      },
-
-      refreshToken: async () => {
-        try {
-          const token = await getAccessToken();
-          set({ accessToken: token || null });
-          return token || null;
-        } catch (error) {
-          console.error('Token refresh error:', error);
-          return null;
-        }
-      },
-
-      initialize: async () => {
-        set({ isLoading: true });
-
-        try {
-          // Check for redirect callback
-          const searchParams = new URLSearchParams(window.location.search);
-          if (searchParams.has('code') && searchParams.has('state')) {
-            await handleRedirectCallback();
-          }
-
-          // Check if user is authenticated
-          const client = await getAuth0Client();
-          const isAuth = await client.isAuthenticated();
-
-          if (isAuth) {
-            const auth0User = await getAuth0User();
-            const token = await getAccessToken();
-
-            if (auth0User && token) {
-              set({ accessToken: token });
-
-              // Sync user with backend
-              try {
-                const response = await apiClient.post('/auth/register', {
-                  auth0Id: auth0User.sub,
-                  email: auth0User.email,
-                  name: auth0User.name || auth0User.nickname,
-                  picture: auth0User.picture,
-                });
-
-                const user: User = {
-                  id: response.data.id,
-                  auth0Id: auth0User.sub,
-                  email: response.data.email,
-                  name: response.data.name,
-                  picture: response.data.picture,
-                  isAdmin: response.data.isAdmin,
-                  createdAt: response.data.createdAt,
-                  updatedAt: response.data.updatedAt,
-                };
-
-                set({
-                  user,
-                  isAuthenticated: true,
-                  isLoading: false,
-                });
-              } catch (error) {
-                console.error('Error syncing user with backend:', error);
-                // User is authenticated with Auth0 but backend sync failed
-                // Still set as authenticated but with basic user info
-                const user: User = {
-                  id: auth0User.sub.replace('|', '_'),
-                  auth0Id: auth0User.sub,
-                  email: auth0User.email || '',
-                  name: auth0User.name || auth0User.nickname || '',
-                  picture: auth0User.picture,
-                  isAdmin: false,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                };
-
-                set({
-                  user,
-                  isAuthenticated: true,
-                  isLoading: false,
-                });
-              }
-            } else {
-              set({
-                user: null,
-                isAuthenticated: false,
-                isLoading: false,
-                accessToken: null,
-              });
+            const status = await apiClient.get('/setup/status')
+            if (!status.data.initialized) {
+                set({ isLoading: false, needsSetup: true, isAuthenticated: false })
+                return
             }
-          } else {
-            set({
-              user: null,
-              isAuthenticated: false,
-              isLoading: false,
-              accessToken: null,
-            });
-          }
-        } catch (error) {
-          console.error('Auth initialization error:', error);
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-            accessToken: null,
-          });
+            try {
+                const me = await apiClient.get('/auth/me')
+                set({
+                    isAuthenticated: true,
+                    isLoading: false,
+                    needsSetup: false,
+                    name: me.data.name || 'Admin',
+                    email: me.data.email || '',
+                })
+            } catch {
+                set({ isAuthenticated: false, isLoading: false, needsSetup: false })
+            }
+        } catch {
+            set({ isAuthenticated: false, isLoading: false, needsSetup: false })
         }
-      },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    }
-  )
-);
+    },
 
-export default useAuthStore;
+    login: async (password) => {
+        await apiClient.post('/auth/login', { password })
+        const me = await apiClient.get('/auth/me')
+        set({
+            isAuthenticated: true,
+            needsSetup: false,
+            name: me.data.name || 'Admin',
+            email: me.data.email || '',
+        })
+    },
+
+    setup: async (password) => {
+        await apiClient.post('/setup', { password })
+        const me = await apiClient.get('/auth/me')
+        set({
+            isAuthenticated: true,
+            needsSetup: false,
+            name: me.data.name || 'Admin',
+            email: me.data.email || '',
+        })
+    },
+
+    logout: async () => {
+        try {
+            await apiClient.post('/auth/logout')
+        } catch {
+            /* swallow — we're logging out anyway */
+        }
+        set({ isAuthenticated: false, name: '', email: '' })
+    },
+}))
+
+// 401 from anywhere → flip the store. Listens once at module load.
+if (typeof window !== 'undefined') {
+    window.addEventListener('auth:unauthorized', () => {
+        useAuthStore.setState({ isAuthenticated: false })
+    })
+}
+
+export default useAuthStore

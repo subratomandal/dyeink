@@ -1,44 +1,22 @@
 import { Link } from 'react-router-dom'
-import { useThemeStore } from '../../../stores/themeStore'
+import { PenSquare } from 'lucide-react'
 
 export default function NewPostButton() {
-    const { theme } = useThemeStore()
-
     return (
-        <div className="new-post-btn" style={{ padding: '0 1.25rem 1.5rem 1.25rem', display: 'flex', justifyContent: 'center' }}>
-            <Link to="/admin/posts/new" className="magic-button">
+        <div className="new-post-btn px-5 pb-6">
+            <Link
+                to="/admin/posts/new"
+                className="magic-button relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold text-white shadow-[0_0_10px_rgba(168,85,247,0.25)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            >
+                <PenSquare className="magic-icon h-4 w-4" />
                 <span className="magic-text">New Post</span>
             </Link>
 
             <style>{`
                 .magic-button {
-                    position: relative;
-                    display: inline-flex;
-                    justify-content: center;
-                    align-items: center;
-                    width: 100%;
-                    padding: 0.85rem 1.5rem;
-                    border-radius: 9999px;
-                    text-decoration: none;
-                    font-weight: 600;
-                    color: white;
-                    overflow: hidden;
                     background: transparent;
                     isolation: isolate;
-                    transform: translateZ(0);
-                    transition: transform 0.2s ease;
-                    box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
                 }
-
-                .magic-button:hover {
-                    transform: scale(1.02);
-                    box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
-                }
-                
-                .magic-button:active {
-                    transform: scale(0.98);
-                }
-
                 .magic-button::before {
                     content: "";
                     position: absolute;
@@ -54,55 +32,38 @@ export default function NewPostButton() {
                         transparent 160deg,
                         transparent 360deg
                     );
-                    animation: rotate 4s linear infinite;
+                    animation: magic-rotate 4s linear infinite;
                     z-index: -2;
                     filter: blur(20px);
                 }
-
                 .magic-button::after {
                     content: "";
                     position: absolute;
                     inset: 3px;
-                    background: ${theme === 'dark' ? '#0f0f0f' : '#ffffff'};
+                    background: hsl(var(--card));
                     border-radius: 9999px;
                     z-index: -1;
                     transition: opacity 0.4s ease;
                 }
-
-
-                ${theme !== 'dark' ? `
-                    .magic-text {
-                        background: none;
-                        color: #0f172a;
-                    }
-                    .magic-button::after {
-                        background: #f8fafc;
-                    }
-                ` : ''}
-
-                .magic-button:hover::after {
-                    opacity: 0;
+                .magic-button:hover::after { opacity: 0; }
+                .magic-text {
+                    background: linear-gradient(to right, hsl(var(--foreground)), hsl(var(--muted-foreground)));
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    color: transparent;
+                    z-index: 10;
+                    position: relative;
+                    letter-spacing: 0.02em;
+                    transition: color 0.3s ease;
                 }
-                
-                .magic-button:hover .magic-text {
+                .magic-icon { color: hsl(var(--foreground)); z-index: 10; position: relative; transition: color 0.3s ease; }
+                .magic-button:hover .magic-text,
+                .magic-button:hover .magic-icon {
                     color: #ffffff;
                     background: none;
                     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 }
-
-                .magic-text {
-                    background: linear-gradient(to right, #fff, #e2e8f0);
-                    -webkit-background-clip: text;
-                    background-clip: text;
-                    color: ${theme === 'dark' ? 'transparent' : '#1e293b'};
-                    z-index: 10;
-                    position: relative;
-                    font-size: 1rem;
-                    letter-spacing: 0.02em;
-                    transition: color 0.3s ease;
-                }
-
-                @keyframes rotate {
+                @keyframes magic-rotate {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
                 }

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import DecryptedText from '../common/animations/DecryptedText'
+import DecryptedText from '@/components/common/animations/DecryptedText'
 
 interface AdminGreetingProps {
     name: string
@@ -7,92 +7,47 @@ interface AdminGreetingProps {
 
 const animatedNames = new Set<string>()
 
-const AdminGreeting = memo(({ name }: AdminGreetingProps) => {
-    const displayName = name.split(' ')[0].slice(0, 12)
+const AdminGreeting = memo(
+    ({ name }: AdminGreetingProps) => {
+        const displayName = name.split(' ')[0].slice(0, 12)
+        const [hasAnimated, setHasAnimated] = useState(() => animatedNames.has(name))
 
-    const [hasAnimated, setHasAnimated] = useState(() => animatedNames.has(name))
+        useEffect(() => {
+            if (!hasAnimated) {
+                const timer = setTimeout(() => {
+                    animatedNames.add(name)
+                    setHasAnimated(true)
+                }, 1000)
+                return () => clearTimeout(timer)
+            }
+        }, [name, hasAnimated])
 
-    useEffect(() => {
-        if (!hasAnimated) {
-            const timer = setTimeout(() => {
-                animatedNames.add(name)
-                setHasAnimated(true)
-            }, 1000)
-            return () => clearTimeout(timer)
-        }
-    }, [name, hasAnimated])
+        useEffect(() => {
+            if (!animatedNames.has(name)) setHasAnimated(false)
+        }, [name])
 
-    useEffect(() => {
-        if (!animatedNames.has(name)) {
-            setHasAnimated(false)
-        }
-    }, [name])
-
-    if (hasAnimated) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '0.4rem' }}>
-                <span style={{
-                    fontSize: '1.5rem',
-                    color: 'var(--text-secondary)',
-                    opacity: 0.8,
-                    fontFamily: "'Jost', sans-serif",
-                    fontWeight: 500,
-                    textShadow: '0 0 25px rgba(255, 255, 255, 0.8)'
-                }}>Hi,</span>
-                <span style={{
-                    fontSize: '1.8rem',
-                    color: 'var(--text-primary)',
-                    lineHeight: 1.2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    fontFamily: "'Jost', sans-serif",
-                    fontWeight: 500,
-                    display: 'block',
-                    height: '2.2rem',
-                    width: '100%'
-                }}>
-                    {displayName}
+            <div data-greeting className="flex flex-col gap-0.5 pl-1.5 font-heading">
+                <span className="text-2xl font-medium text-muted-foreground opacity-80 [text-shadow:0_0_25px_rgba(255,255,255,0.4)]">
+                    Hi,
+                </span>
+                <span className="block h-[2.2rem] w-full truncate text-[1.75rem] font-medium leading-tight text-foreground">
+                    {hasAnimated ? (
+                        displayName
+                    ) : (
+                        <DecryptedText
+                            text={displayName}
+                            speed={60}
+                            maxIterations={15}
+                            animateOn="view"
+                            revealDirection="start"
+                        />
+                    )}
                 </span>
             </div>
         )
-    }
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '0.4rem' }}>
-            <span style={{
-                fontSize: '1.5rem',
-                color: 'var(--text-secondary)',
-                opacity: 0.8,
-                fontFamily: "'Jost', sans-serif",
-                fontWeight: 500,
-                textShadow: '0 0 25px rgba(255, 255, 255, 0.8)'
-            }}>Hi,</span>
-            <span style={{
-                fontSize: '1.8rem',
-                color: 'var(--text-primary)',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                fontFamily: "'Jost', sans-serif",
-                fontWeight: 500,
-                display: 'block',
-                height: '2.2rem',
-                width: '100%'
-            }}>
-                <DecryptedText
-                    text={displayName}
-                    speed={60}
-                    maxIterations={15}
-                    animateOn="view"
-                    revealDirection="start"
-                />
-            </span>
-        </div>
-    )
-}, (prevProps, nextProps) => {
-    return prevProps.name === nextProps.name
-})
+    },
+    (prevProps, nextProps) => prevProps.name === nextProps.name,
+)
 
 export default AdminGreeting

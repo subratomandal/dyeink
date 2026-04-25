@@ -1,27 +1,19 @@
 import { Moon, Sun } from 'lucide-react'
-import { useThemeStore } from '../../../stores/themeStore'
-import './NeumorphismButton.css'
+import { useThemeStore } from '@/stores/themeStore'
+import { Button } from '@/components/ui/button'
+
 export default function ThemeToggle() {
     const { theme, toggleTheme } = useThemeStore()
     return (
-        <button
+        <Button
+            variant="outline"
+            size="icon"
             onClick={toggleTheme}
-            className="neu-btn"
-            style={{
-                width: '40px',
-                height: '40px',
-                padding: 0,
-                justifyContent: 'center',
-                borderRadius: '50%',
-            }}
+            className="h-10 w-10 rounded-full"
             title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
         >
-            {theme === 'light' ? (
-                <Moon size={20} />
-            ) : (
-                <Sun size={20} />
-            )}
-        </button>
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            <span className="sr-only">Toggle theme</span>
+        </Button>
     )
 }
-

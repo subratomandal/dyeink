@@ -1,683 +1,735 @@
 /**
- * Cloudflare Worker Entry Point
+ * DyeInk — single-admin personal blog API, all-in-one Cloudflare Worker.
  *
- * Note: This worker uses HTTP fetch to connect to MongoDB Atlas Data API
- * since Cloudflare Workers don't support native MongoDB drivers.
+ * - D1 for relational storage (`DB` binding)
+ * - R2 for image uploads (`IMAGES` binding)
+ * - Static assets served from the `ASSETS` binding (the Pages-style bundle)
+ * - Password auth via PBKDF2 + HMAC-signed HTTPOnly session cookies
  *
- * For development/testing, use the standard Node.js server (src/index.ts).
- * For production on Cloudflare Workers, this file handles all API requests.
+ * No Node, no MongoDB, no external auth provider. One deploy, one password.
  */
 
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { jwt } from 'hono/jwt';
-import { MongoDBService } from './services/mongodb-api.js';
-import { Auth0Service } from './services/auth0-worker.js';
-import { R2StorageService } from './services/r2-worker.js';
+import { Hono, type Context, type Next } from 'hono'
+import { cors } from 'hono/cors'
+import {
+  clearSessionCookie,
+  createSessionToken,
+  hashPassword,
+  randomToken,
+  readSessionCookie,
+  verifyPassword,
+  verifySessionToken,
+} from './lib/crypto'
 
 type Bindings = {
-  MONGODB_URI: string;
-  MONGODB_DATA_API_KEY: string;
-  MONGODB_DATA_API_URL: string;
-  MONGODB_DATABASE: string;
-  AUTH0_DOMAIN: string;
-  AUTH0_AUDIENCE: string;
-  AUTH0_CLIENT_ID: string;
-  AUTH0_CLIENT_SECRET: string;
-  AUTH0_MANAGEMENT_API_TOKEN: string;
-  R2_ACCOUNT_ID: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
-  R2_BUCKET_NAME: string;
-  R2_PUBLIC_URL: string;
-  VERCEL_TOKEN: string;
-  VERCEL_PROJECT_ID: string;
-  VERCEL_TEAM_ID: string;
-  IMAGES: R2Bucket;
-};
+  DB: D1Database
+  IMAGES: R2Bucket
+  ASSETS: Fetcher
+  APP_PASSWORD?: string // optional: seeds the admin row on first deploy if present
+  FRONTEND_ORIGIN?: string
+  R2_PUBLIC_URL?: string
+}
 
 type Variables = {
-  user?: {
-    id: string;
-    auth0Id: string;
-    email: string;
-    name: string;
-    picture?: string;
-    isAdmin: boolean;
-  };
-  db: MongoDBService;
-};
+  session?: { iat: number; exp: number }
+}
 
-const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
-// CORS
-app.use('*', cors({
-  origin: '*',
-  credentials: true,
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-}));
+// ---------- Global middleware ----------
 
-// Initialize MongoDB service
-app.use('*', async (c, next) => {
-  const db = new MongoDBService(
-    c.env.MONGODB_DATA_API_URL,
-    c.env.MONGODB_DATA_API_KEY,
-    c.env.MONGODB_DATABASE
-  );
-  c.set('db', db);
-  await next();
-});
+app.use('/api/*', (c, next) => {
+  const origin = c.env.FRONTEND_ORIGIN || c.req.header('origin') || '*'
+  return cors({
+    origin,
+    credentials: true,
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  })(c, next)
+})
 
-// Health check
-app.get('/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// ---------- Auth middleware ----------
 
-// Auth middleware
-const authMiddleware = async (c: any, next: any) => {
-  const authHeader = c.req.header('Authorization');
+type AppCtx = Context<{ Bindings: Bindings; Variables: Variables }>
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: 'Missing or invalid authorization header' }, 401);
+async function getSessionSecret(c: AppCtx): Promise<string | null> {
+  const row = await c.env.DB.prepare('SELECT session_secret FROM admin WHERE id = 1')
+    .first<{ session_secret: string }>()
+  return row?.session_secret ?? null
+}
+
+async function requireAuth(c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) {
+  const cookie = readSessionCookie(c.req.header('cookie') ?? null)
+  if (!cookie) return c.json({ error: 'Not authenticated' }, 401)
+
+  const secret = await getSessionSecret(c)
+  if (!secret) return c.json({ error: 'Admin not initialized' }, 401)
+
+  const payload = await verifySessionToken(cookie, secret)
+  if (!payload) return c.json({ error: 'Invalid or expired session' }, 401)
+
+  c.set('session', { iat: payload.iat, exp: payload.exp })
+  await next()
+}
+
+// ---------- Rate limiting for /auth/login ----------
+
+const LOGIN_WINDOW_SEC = 15 * 60
+const LOGIN_MAX_ATTEMPTS = 10
+
+async function recordLoginAttempt(db: D1Database, ip: string, success: boolean) {
+  await db
+    .prepare('INSERT INTO login_attempts (ip, attempted_at, success) VALUES (?, ?, ?)')
+    .bind(ip, Math.floor(Date.now() / 1000), success ? 1 : 0)
+    .run()
+  // Opportunistic cleanup — drop rows older than the window.
+  const cutoff = Math.floor(Date.now() / 1000) - LOGIN_WINDOW_SEC
+  await db.prepare('DELETE FROM login_attempts WHERE attempted_at < ?').bind(cutoff).run()
+}
+
+async function isRateLimited(db: D1Database, ip: string): Promise<boolean> {
+  const cutoff = Math.floor(Date.now() / 1000) - LOGIN_WINDOW_SEC
+  const row = await db
+    .prepare(
+      'SELECT COUNT(*) AS n FROM login_attempts WHERE ip = ? AND success = 0 AND attempted_at >= ?',
+    )
+    .bind(ip, cutoff)
+    .first<{ n: number }>()
+  return (row?.n ?? 0) >= LOGIN_MAX_ATTEMPTS
+}
+
+// ---------- Setup / bootstrap ----------
+
+/**
+ * On first request, seed the admin row from APP_PASSWORD if present.
+ * If APP_PASSWORD isn't set, GET /api/setup/status returns { initialized: false }
+ * and the UI shows a setup form.
+ */
+async function ensureBootstrap(c: AppCtx) {
+  const row = await c.env.DB.prepare('SELECT id FROM admin WHERE id = 1').first()
+  if (row) return
+
+  const seed = c.env.APP_PASSWORD
+  if (!seed) return // leave uninitialized; UI will drive setup
+
+  const passwordHash = await hashPassword(seed)
+  await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO admin (id, password_hash, session_secret) VALUES (1, ?, ?)',
+  )
+    .bind(passwordHash, randomToken(32))
+    .run()
+
+  await c.env.DB.prepare('INSERT OR IGNORE INTO site_settings (id) VALUES (1)').run()
+}
+
+app.use('/api/*', async (c, next) => {
+  await ensureBootstrap(c)
+  await next()
+})
+
+// ==========================================================================
+// SETUP / AUTH
+// ==========================================================================
+
+app.get('/api/setup/status', async (c) => {
+  const row = await c.env.DB.prepare('SELECT id FROM admin WHERE id = 1').first()
+  return c.json({ initialized: !!row })
+})
+
+app.post('/api/setup', async (c) => {
+  const row = await c.env.DB.prepare('SELECT id FROM admin WHERE id = 1').first()
+  if (row) return c.json({ error: 'Already initialized' }, 400)
+
+  const body = await c.req.json<{ password?: string }>()
+  const password = body.password?.toString() ?? ''
+  if (!isStrongPassword(password)) {
+    return c.json(
+      {
+        error:
+          'Password must be at least 12 characters and include upper, lower, number, and a special character.',
+      },
+      400,
+    )
   }
 
-  const token = authHeader.substring(7);
+  const passwordHash = await hashPassword(password)
+  const secret = randomToken(32)
+  await c.env.DB.prepare(
+    'INSERT INTO admin (id, password_hash, session_secret) VALUES (1, ?, ?)',
+  )
+    .bind(passwordHash, secret)
+    .run()
+  await c.env.DB.prepare('INSERT OR IGNORE INTO site_settings (id) VALUES (1)').run()
+
+  const { cookie } = await createSessionToken(secret)
+  c.header('Set-Cookie', cookie)
+  return c.json({ ok: true })
+})
+
+app.post('/api/auth/login', async (c) => {
+  const ip = c.req.header('cf-connecting-ip') ?? 'unknown'
+
+  if (await isRateLimited(c.env.DB, ip)) {
+    return c.json({ error: 'Too many attempts. Try again in 15 minutes.' }, 429)
+  }
+
+  const body = await c.req.json<{ password?: string }>()
+  const password = body.password?.toString() ?? ''
+
+  const row = await c.env.DB.prepare(
+    'SELECT password_hash, session_secret FROM admin WHERE id = 1',
+  ).first<{ password_hash: string; session_secret: string }>()
+
+  if (!row) {
+    await recordLoginAttempt(c.env.DB, ip, false)
+    return c.json({ error: 'Admin not initialized' }, 404)
+  }
+
+  const ok = await verifyPassword(password, row.password_hash)
+  await recordLoginAttempt(c.env.DB, ip, ok)
+
+  if (!ok) return c.json({ error: 'Invalid password' }, 401)
+
+  const { cookie } = await createSessionToken(row.session_secret)
+  c.header('Set-Cookie', cookie)
+  return c.json({ ok: true })
+})
+
+app.post('/api/auth/logout', async (c) => {
+  c.header('Set-Cookie', clearSessionCookie())
+  return c.json({ ok: true })
+})
+
+app.get('/api/auth/me', requireAuth, async (c) => {
+  const session = c.get('session')!
+  const settings = await c.env.DB.prepare(
+    'SELECT author_name, author_email FROM site_settings WHERE id = 1',
+  ).first<{ author_name: string; author_email: string }>()
+  return c.json({
+    name: settings?.author_name || 'Admin',
+    email: settings?.author_email || '',
+    sessionExpiresAt: session.exp,
+  })
+})
+
+app.post('/api/auth/change-password', requireAuth, async (c) => {
+  const { current, next } = await c.req.json<{ current?: string; next?: string }>()
+  if (!current || !next) return c.json({ error: 'current + next required' }, 400)
+  if (!isStrongPassword(next)) {
+    return c.json({ error: 'New password is too weak.' }, 400)
+  }
+
+  const row = await c.env.DB.prepare('SELECT password_hash FROM admin WHERE id = 1').first<{
+    password_hash: string
+  }>()
+  if (!row || !(await verifyPassword(current, row.password_hash))) {
+    return c.json({ error: 'Current password incorrect' }, 401)
+  }
+
+  const newHash = await hashPassword(next)
+  const newSecret = randomToken(32) // rotate: invalidates all sessions
+  await c.env.DB.prepare(
+    'UPDATE admin SET password_hash = ?, session_secret = ?, updated_at = unixepoch() WHERE id = 1',
+  )
+    .bind(newHash, newSecret)
+    .run()
+
+  const { cookie } = await createSessionToken(newSecret)
+  c.header('Set-Cookie', cookie)
+  return c.json({ ok: true })
+})
+
+// ==========================================================================
+// POSTS
+// ==========================================================================
+
+interface PostRow {
+  id: string
+  title: string
+  slug: string
+  content: string
+  excerpt: string
+  cover_image: string | null
+  published: number
+  published_at: number | null
+  views: number
+  shares: number
+  created_at: number
+  updated_at: number
+}
+
+function serializePost(p: PostRow) {
+  return {
+    id: p.id,
+    title: p.title,
+    slug: p.slug,
+    content: p.content,
+    excerpt: p.excerpt,
+    coverImage: p.cover_image || '',
+    published: !!p.published,
+    publishedAt: p.published_at ? new Date(p.published_at * 1000).toISOString() : null,
+    views: p.views,
+    shares: p.shares,
+    createdAt: new Date(p.created_at * 1000).toISOString(),
+    updatedAt: new Date(p.updated_at * 1000).toISOString(),
+  }
+}
+
+app.get('/api/posts', requireAuth, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM posts ORDER BY created_at DESC',
+  ).all<PostRow>()
+  return c.json({ posts: results.map(serializePost), total: results.length })
+})
+
+app.post('/api/posts', requireAuth, async (c) => {
+  const body = await c.req.json<{
+    title: string
+    slug?: string
+    content?: string
+    excerpt?: string
+    coverImage?: string
+    published?: boolean
+  }>()
+
+  const title = body.title?.trim()
+  if (!title) return c.json({ error: 'Title is required' }, 400)
+  const slug = (body.slug || slugify(title)).slice(0, 120)
+  const id = randomToken(12)
+  const now = Math.floor(Date.now() / 1000)
+  const published = body.published ? 1 : 0
 
   try {
-    const auth0 = new Auth0Service(c.env.AUTH0_DOMAIN, c.env.AUTH0_AUDIENCE);
-    const payload = await auth0.verifyToken(token);
-
-    const db = c.get('db');
-    let user = await db.findOne('users', { auth0Id: payload.sub });
-
-    if (!user) {
-      const userId = payload.sub.replace('|', '_');
-      user = await db.insertOne('users', {
-        _id: userId,
-        auth0Id: payload.sub,
-        email: payload.email || '',
-        name: payload.name || '',
-        picture: payload.picture,
-        isAdmin: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      user._id = userId;
+    await c.env.DB.prepare(
+      `INSERT INTO posts
+       (id, title, slug, content, excerpt, cover_image, published, published_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        title,
+        slug,
+        body.content ?? '',
+        body.excerpt ?? '',
+        body.coverImage ?? null,
+        published,
+        published ? now : null,
+        now,
+        now,
+      )
+      .run()
+  } catch (e: any) {
+    if (String(e.message).includes('UNIQUE')) {
+      return c.json({ error: 'A post with this slug already exists' }, 400)
     }
-
-    c.set('user', {
-      id: user._id,
-      auth0Id: user.auth0Id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      isAdmin: user.isAdmin,
-    });
-
-    await next();
-  } catch (error) {
-    console.error('Auth error:', error);
-    return c.json({ error: 'Invalid or expired token' }, 401);
-  }
-};
-
-// ==================== AUTH ROUTES ====================
-
-app.post('/api/auth/register', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-  const dbUser = await db.findOne('users', { _id: user.id });
-
-  return c.json({
-    id: dbUser._id,
-    email: dbUser.email,
-    name: dbUser.name,
-    picture: dbUser.picture,
-    isAdmin: dbUser.isAdmin,
-    createdAt: dbUser.createdAt,
-    updatedAt: dbUser.updatedAt,
-  });
-});
-
-app.get('/api/auth/me', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-  const dbUser = await db.findOne('users', { _id: user.id });
-
-  if (!dbUser) return c.json({ error: 'User not found' }, 404);
-
-  return c.json({
-    id: dbUser._id,
-    email: dbUser.email,
-    name: dbUser.name,
-    picture: dbUser.picture,
-    isAdmin: dbUser.isAdmin,
-    createdAt: dbUser.createdAt,
-    updatedAt: dbUser.updatedAt,
-  });
-});
-
-app.delete('/api/auth/delete', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-
-  await Promise.all([
-    db.deleteOne('users', { _id: user.id }),
-    db.deleteOne('site_settings', { userId: user.id }),
-  ]);
-
-  return c.json({ success: true });
-});
-
-// ==================== POSTS ROUTES ====================
-
-app.post('/api/posts', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const body = await c.req.json();
-  const { title, slug, content, excerpt, coverImage, published } = body;
-
-  const db = c.get('db');
-
-  const existingPost = await db.findOne('posts', { userId: user.id, slug });
-  if (existingPost) {
-    return c.json({ error: 'A post with this slug already exists' }, 400);
+    throw e
   }
 
-  const post = await db.insertOne('posts', {
-    userId: user.id,
-    title,
-    slug,
-    content: content || '',
-    excerpt: excerpt || '',
-    coverImage: coverImage || '',
-    published: published || false,
-    publishedAt: published ? new Date() : null,
-    views: 0,
-    shares: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return c.json(post);
-});
-
-app.get('/api/posts', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-  const posts = await db.find('posts', { userId: user.id }, { sort: { createdAt: -1 } });
-
-  return c.json({ posts, total: posts.length });
-});
+  const row = await c.env.DB.prepare('SELECT * FROM posts WHERE id = ?')
+    .bind(id)
+    .first<PostRow>()
+  return c.json(serializePost(row!), 201)
+})
 
 app.get('/api/posts/public', async (c) => {
-  const subdomain = c.req.query('subdomain');
-  const customDomain = c.req.query('customDomain');
-
-  const db = c.get('db');
-
-  let settings;
-  if (customDomain) {
-    settings = await db.findOne('site_settings', { customDomain: { $regex: `^${customDomain}$`, $options: 'i' } });
-  } else if (subdomain) {
-    settings = await db.findOne('site_settings', { subdomain });
-  }
-
-  if (!settings) {
-    return c.json({ error: 'Blog not found' }, 404);
-  }
-
-  const posts = await db.find('posts', { userId: settings.userId, published: true }, { sort: { publishedAt: -1 } });
-
-  return c.json({ posts });
-});
-
-app.get('/api/posts/:id', async (c) => {
-  const id = c.req.param('id');
-  const db = c.get('db');
-
-  const post = await db.findOne('posts', { _id: { $oid: id } });
-  if (!post) return c.json({ error: 'Post not found' }, 404);
-
-  return c.json(post);
-});
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM posts WHERE published = 1 ORDER BY published_at DESC',
+  ).all<PostRow>()
+  return c.json({ posts: results.map(serializePost) })
+})
 
 app.get('/api/posts/slug/:slug', async (c) => {
-  const slug = c.req.param('slug');
-  const userId = c.req.query('userId');
+  const slug = c.req.param('slug')
+  const row = await c.env.DB.prepare('SELECT * FROM posts WHERE slug = ?')
+    .bind(slug)
+    .first<PostRow>()
+  if (!row) return c.json({ error: 'Post not found' }, 404)
 
-  const db = c.get('db');
+  // If unpublished, require auth
+  if (!row.published) {
+    const session = await authPeek(c)
+    if (!session) return c.json({ error: 'Not found' }, 404)
+  }
+  return c.json(serializePost(row))
+})
 
-  const query: any = { slug };
-  if (userId) query.userId = userId;
+app.get('/api/posts/:id', async (c) => {
+  const id = c.req.param('id')
+  const row = await c.env.DB.prepare('SELECT * FROM posts WHERE id = ?')
+    .bind(id)
+    .first<PostRow>()
+  if (!row) return c.json({ error: 'Post not found' }, 404)
+  if (!row.published) {
+    const session = await authPeek(c)
+    if (!session) return c.json({ error: 'Not found' }, 404)
+  }
+  return c.json(serializePost(row))
+})
 
-  const post = await db.findOne('posts', query);
-  if (!post) return c.json({ error: 'Post not found' }, 404);
+app.put('/api/posts/:id', requireAuth, async (c) => {
+  const id = c.req.param('id')
+  const existing = await c.env.DB.prepare('SELECT * FROM posts WHERE id = ?')
+    .bind(id)
+    .first<PostRow>()
+  if (!existing) return c.json({ error: 'Post not found' }, 404)
 
-  return c.json(post);
-});
+  const body = await c.req.json<{
+    title?: string
+    slug?: string
+    content?: string
+    excerpt?: string
+    coverImage?: string | null
+    published?: boolean
+  }>()
 
-app.put('/api/posts/:id', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+  const now = Math.floor(Date.now() / 1000)
+  const title = body.title ?? existing.title
+  const slug = body.slug ?? existing.slug
+  const content = body.content ?? existing.content
+  const excerpt = body.excerpt ?? existing.excerpt
+  const coverImage = body.coverImage === undefined ? existing.cover_image : body.coverImage
+  const published = body.published === undefined ? !!existing.published : body.published
+  let publishedAt = existing.published_at
+  if (published && !existing.published) publishedAt = now
+  else if (!published) publishedAt = null
 
-  const id = c.req.param('id');
-  const updates = await c.req.json();
-
-  const db = c.get('db');
-
-  const post = await db.findOne('posts', { _id: { $oid: id } });
-  if (!post) return c.json({ error: 'Post not found' }, 404);
-  if (post.userId !== user.id) return c.json({ error: 'Access denied' }, 403);
-
-  if (updates.published && !post.published) {
-    updates.publishedAt = new Date();
-  } else if (updates.published === false) {
-    updates.publishedAt = null;
+  try {
+    await c.env.DB.prepare(
+      `UPDATE posts SET title = ?, slug = ?, content = ?, excerpt = ?, cover_image = ?,
+       published = ?, published_at = ?, updated_at = ? WHERE id = ?`,
+    )
+      .bind(title, slug, content, excerpt, coverImage, published ? 1 : 0, publishedAt, now, id)
+      .run()
+  } catch (e: any) {
+    if (String(e.message).includes('UNIQUE')) {
+      return c.json({ error: 'A post with this slug already exists' }, 400)
+    }
+    throw e
   }
 
-  updates.updatedAt = new Date();
+  const row = await c.env.DB.prepare('SELECT * FROM posts WHERE id = ?')
+    .bind(id)
+    .first<PostRow>()
+  return c.json(serializePost(row!))
+})
 
-  const updatedPost = await db.updateOne('posts', { _id: { $oid: id } }, { $set: updates });
+app.delete('/api/posts/:id', requireAuth, async (c) => {
+  const id = c.req.param('id')
+  const res = await c.env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id).run()
+  if (res.meta.changes === 0) return c.json({ error: 'Post not found' }, 404)
+  return c.json({ ok: true })
+})
 
-  return c.json(updatedPost);
-});
+app.delete('/api/posts', requireAuth, async (c) => {
+  await c.env.DB.prepare('DELETE FROM posts').run()
+  return c.json({ ok: true })
+})
 
-app.delete('/api/posts/:id', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+// ==========================================================================
+// SETTINGS (singleton)
+// ==========================================================================
 
-  const id = c.req.param('id');
-  const db = c.get('db');
+interface SettingsRow {
+  id: number
+  site_name: string
+  site_description: string
+  author_name: string
+  author_email: string
+  newsletter_enabled: number
+  twitter_link: string | null
+  linkedin_link: string | null
+  github_link: string | null
+  website_link: string | null
+  dribbble_link: string | null
+  huggingface_link: string | null
+  leetcode_link: string | null
+  created_at: number
+  updated_at: number
+}
 
-  const post = await db.findOne('posts', { _id: { $oid: id } });
-  if (!post) return c.json({ error: 'Post not found' }, 404);
-  if (post.userId !== user.id) return c.json({ error: 'Access denied' }, 403);
+function serializeSettings(r: SettingsRow | null) {
+  if (!r) return null
+  return {
+    siteName: r.site_name,
+    siteDescription: r.site_description,
+    authorName: r.author_name,
+    authorEmail: r.author_email,
+    newsletterEnabled: !!r.newsletter_enabled,
+    twitterLink: r.twitter_link,
+    linkedinLink: r.linkedin_link,
+    githubLink: r.github_link,
+    websiteLink: r.website_link,
+    dribbbleLink: r.dribbble_link,
+    huggingfaceLink: r.huggingface_link,
+    leetcodeLink: r.leetcode_link,
+  }
+}
 
-  await db.deleteOne('posts', { _id: { $oid: id } });
+app.get('/api/settings', async (c) => {
+  const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
+  return c.json(serializeSettings(row))
+})
 
-  return c.json({ success: true });
-});
+app.put('/api/settings', requireAuth, async (c) => {
+  const body = await c.req.json<{
+    siteName?: string
+    siteDescription?: string
+    authorName?: string
+    authorEmail?: string
+    newsletterEnabled?: boolean
+    twitterLink?: string | null
+    linkedinLink?: string | null
+    githubLink?: string | null
+    websiteLink?: string | null
+    dribbbleLink?: string | null
+    huggingfaceLink?: string | null
+    leetcodeLink?: string | null
+  }>()
 
-app.delete('/api/posts', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+  await c.env.DB.prepare('INSERT OR IGNORE INTO site_settings (id) VALUES (1)').run()
 
-  const db = c.get('db');
-  await db.deleteMany('posts', { userId: user.id });
+  const existing = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
 
-  return c.json({ success: true });
-});
-
-// ==================== SETTINGS ROUTES ====================
-
-app.get('/api/settings', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-  let settings = await db.findOne('site_settings', { userId: user.id });
-
-  if (!settings) {
-    const subdomain = `blog-${user.id.slice(0, 8)}`;
-    settings = await db.insertOne('site_settings', {
-      userId: user.id,
-      siteName: user.name || 'My Blog',
-      siteDescription: '',
-      subdomain,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  const merged = {
+    site_name: body.siteName ?? existing!.site_name,
+    site_description: body.siteDescription ?? existing!.site_description,
+    author_name: body.authorName ?? existing!.author_name,
+    author_email: body.authorEmail ?? existing!.author_email,
+    newsletter_enabled:
+      body.newsletterEnabled === undefined ? existing!.newsletter_enabled : body.newsletterEnabled ? 1 : 0,
+    twitter_link: body.twitterLink === undefined ? existing!.twitter_link : body.twitterLink,
+    linkedin_link: body.linkedinLink === undefined ? existing!.linkedin_link : body.linkedinLink,
+    github_link: body.githubLink === undefined ? existing!.github_link : body.githubLink,
+    website_link: body.websiteLink === undefined ? existing!.website_link : body.websiteLink,
+    dribbble_link: body.dribbbleLink === undefined ? existing!.dribbble_link : body.dribbbleLink,
+    huggingface_link:
+      body.huggingfaceLink === undefined ? existing!.huggingface_link : body.huggingfaceLink,
+    leetcode_link: body.leetcodeLink === undefined ? existing!.leetcode_link : body.leetcodeLink,
   }
 
-  return c.json(settings);
-});
+  await c.env.DB.prepare(
+    `UPDATE site_settings SET site_name = ?, site_description = ?, author_name = ?,
+     author_email = ?, newsletter_enabled = ?, twitter_link = ?, linkedin_link = ?,
+     github_link = ?, website_link = ?, dribbble_link = ?, huggingface_link = ?,
+     leetcode_link = ?, updated_at = unixepoch() WHERE id = 1`,
+  )
+    .bind(
+      merged.site_name,
+      merged.site_description,
+      merged.author_name,
+      merged.author_email,
+      merged.newsletter_enabled,
+      merged.twitter_link,
+      merged.linkedin_link,
+      merged.github_link,
+      merged.website_link,
+      merged.dribbble_link,
+      merged.huggingface_link,
+      merged.leetcode_link,
+    )
+    .run()
 
-app.get('/api/settings/subdomain/:subdomain', async (c) => {
-  const subdomain = c.req.param('subdomain');
-  const db = c.get('db');
+  const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
+    .first<SettingsRow>()
+  return c.json(serializeSettings(row))
+})
 
-  const settings = await db.findOne('site_settings', { subdomain });
-  if (!settings) return c.json({ error: 'Blog not found' }, 404);
-
-  return c.json(settings);
-});
-
-app.get('/api/settings/domain/:domain', async (c) => {
-  const domain = c.req.param('domain');
-  const db = c.get('db');
-
-  const settings = await db.findOne('site_settings', { customDomain: { $regex: `^${domain}$`, $options: 'i' } });
-  if (!settings) return c.json({ error: 'Blog not found' }, 404);
-
-  return c.json(settings);
-});
-
-app.put('/api/settings', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const updates = await c.req.json();
-  updates.updatedAt = new Date();
-
-  const db = c.get('db');
-
-  const settings = await db.updateOne(
-    'site_settings',
-    { userId: user.id },
-    { $set: updates },
-    { upsert: true }
-  );
-
-  return c.json(settings);
-});
-
-app.post('/api/settings/initialize', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-  let settings = await db.findOne('site_settings', { userId: user.id });
-
-  if (settings) return c.json(settings);
-
-  const body = await c.req.json();
-  const subdomain = body.subdomain || `blog-${user.id.slice(0, 8)}`;
-
-  settings = await db.insertOne('site_settings', {
-    userId: user.id,
-    siteName: body.siteName || user.name || 'My Blog',
-    siteDescription: body.siteDescription || '',
-    subdomain,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  return c.json(settings);
-});
-
-// ==================== STATS ROUTES ====================
+// ==========================================================================
+// STATS
+// ==========================================================================
 
 app.get('/api/hit', async (c) => {
-  const id = c.req.query('id');
-  const type = c.req.query('type') as 'view' | 'share';
-
-  if (!id || !type || !['view', 'share'].includes(type)) {
-    return c.json({ error: 'Invalid parameters' }, 400);
+  const id = c.req.query('id')
+  const type = c.req.query('type')
+  if (!id || (type !== 'view' && type !== 'share')) {
+    return c.json({ error: 'Invalid parameters' }, 400)
   }
 
-  const db = c.get('db');
+  const post = await c.env.DB.prepare('SELECT id FROM posts WHERE id = ?').bind(id).first()
+  if (!post) return c.json({ error: 'Post not found' }, 404)
 
-  const updateField = type === 'view' ? 'views' : 'shares';
-  await db.updateOne('posts', { _id: { $oid: id } }, { $inc: { [updateField]: 1 } });
+  const field = type === 'view' ? 'views' : 'shares'
+  const dayUtc = Math.floor(Date.now() / 1000 / 86400) * 86400
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  await c.env.DB.batch([
+    c.env.DB.prepare(`UPDATE posts SET ${field} = ${field} + 1 WHERE id = ?`).bind(id),
+    c.env.DB.prepare(
+      `INSERT INTO daily_stats (post_id, day_utc, ${field}) VALUES (?, ?, 1)
+       ON CONFLICT(post_id, day_utc) DO UPDATE SET ${field} = ${field} + 1`,
+    ).bind(id, dayUtc),
+  ])
 
-  await db.updateOne(
-    'daily_post_stats',
-    { postId: { $oid: id }, date: today },
-    { $inc: { [updateField]: 1 } },
-    { upsert: true }
-  );
+  return c.json({ ok: true })
+})
 
-  return c.json({ ok: true });
-});
+app.get('/api/stats', requireAuth, async (c) => {
+  const totals = await c.env.DB.prepare(
+    'SELECT COALESCE(SUM(views), 0) AS views, COALESCE(SUM(shares), 0) AS shares FROM posts',
+  ).first<{ views: number; shares: number }>()
 
-app.get('/api/stats', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+  const subs = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM subscribers WHERE active = 1',
+  ).first<{ n: number }>()
 
-  const db = c.get('db');
+  const now = Math.floor(Date.now() / 1000)
+  const sevenDaysAgo = now - 6 * 86400
+  const startOfToday = Math.floor(now / 86400) * 86400
+  const startOfWindow = Math.floor(sevenDaysAgo / 86400) * 86400
 
-  const posts = await db.find('posts', { userId: user.id });
+  const { results } = await c.env.DB.prepare(
+    `SELECT day_utc, SUM(views) AS views, SUM(shares) AS shares
+     FROM daily_stats WHERE day_utc >= ? GROUP BY day_utc ORDER BY day_utc ASC`,
+  )
+    .bind(startOfWindow)
+    .all<{ day_utc: number; views: number; shares: number }>()
 
-  const totalViews = posts.reduce((sum: number, p: any) => sum + (p.views || 0), 0);
-  const totalShares = posts.reduce((sum: number, p: any) => sum + (p.shares || 0), 0);
-
-  const settings = await db.findOne('site_settings', { userId: user.id });
-  let totalSubscribers = 0;
-  if (settings) {
-    const subscribers = await db.find('subscribers', { blogId: settings._id, active: true });
-    totalSubscribers = subscribers.length;
-  }
-
-  // Get last 7 days
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
-
-  const graphData = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(sevenDaysAgo);
-    date.setDate(date.getDate() + i);
+  const graphData = []
+  for (let d = startOfWindow; d <= startOfToday; d += 86400) {
+    const hit = results.find((r) => r.day_utc === d)
+    const date = new Date(d * 1000).toISOString().split('T')[0]
     graphData.push({
-      date: date.toISOString().split('T')[0],
-      views: 0,
-      shares: 0,
-    });
+      date,
+      name: new Date(d * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      views: hit?.views ?? 0,
+      shares: hit?.shares ?? 0,
+    })
   }
 
-  return c.json({ totalViews, totalShares, totalSubscribers, graphData });
-});
+  return c.json({
+    totalViews: totals?.views ?? 0,
+    totalShares: totals?.shares ?? 0,
+    totalSubscribers: subs?.n ?? 0,
+    graphData,
+  })
+})
 
-// ==================== SUBSCRIBERS ROUTES ====================
+// ==========================================================================
+// SUBSCRIBERS
+// ==========================================================================
 
 app.post('/api/subscribe', async (c) => {
-  const body = await c.req.json();
-  const { email, blogId, subdomain, customDomain } = body;
-
-  if (!email) return c.json({ error: 'Email is required' }, 400);
-
-  const db = c.get('db');
-
-  let settings;
-  if (blogId) {
-    settings = await db.findOne('site_settings', { _id: { $oid: blogId } });
-  } else if (subdomain) {
-    settings = await db.findOne('site_settings', { subdomain });
-  } else if (customDomain) {
-    settings = await db.findOne('site_settings', { customDomain: { $regex: `^${customDomain}$`, $options: 'i' } });
+  const body = await c.req.json<{ email?: string }>()
+  const email = body.email?.trim().toLowerCase()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return c.json({ error: 'Invalid email' }, 400)
   }
 
-  if (!settings) return c.json({ error: 'Blog not found' }, 404);
-
-  const existing = await db.findOne('subscribers', { email: email.toLowerCase(), blogId: settings._id });
+  const existing = await c.env.DB.prepare('SELECT id, active FROM subscribers WHERE email = ?')
+    .bind(email)
+    .first<{ id: string; active: number }>()
 
   if (existing) {
     if (!existing.active) {
-      await db.updateOne('subscribers', { _id: existing._id }, { $set: { active: true } });
-      return c.json({ ok: true, message: 'Subscription reactivated' });
+      await c.env.DB.prepare('UPDATE subscribers SET active = 1 WHERE id = ?')
+        .bind(existing.id)
+        .run()
+      return c.json({ ok: true, message: 'Subscription reactivated' })
     }
-    return c.json({ ok: true, message: 'Already subscribed' });
+    return c.json({ ok: true, message: 'Already subscribed' })
   }
 
-  await db.insertOne('subscribers', {
-    email: email.toLowerCase(),
-    blogId: settings._id,
-    active: true,
-    verified: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
+  await c.env.DB.prepare('INSERT INTO subscribers (id, email) VALUES (?, ?)')
+    .bind(randomToken(12), email)
+    .run()
+  return c.json({ ok: true, message: 'Subscribed' })
+})
 
-  return c.json({ ok: true, message: 'Subscribed successfully' });
-});
-
-app.get('/api/subscribers', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-
-  const settings = await db.findOne('site_settings', { userId: user.id });
-  if (!settings) return c.json({ subscribers: [], total: 0 });
-
-  const subscribers = await db.find('subscribers', { blogId: settings._id, active: true });
-
+app.get('/api/subscribers', requireAuth, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT id, email, verified, created_at FROM subscribers WHERE active = 1 ORDER BY created_at DESC',
+  ).all<{ id: string; email: string; verified: number; created_at: number }>()
   return c.json({
-    subscribers: subscribers.map((s: any) => ({
-      id: s._id,
-      email: s.email,
-      verified: s.verified,
-      createdAt: s.createdAt,
+    subscribers: results.map((r) => ({
+      id: r.id,
+      email: r.email,
+      verified: !!r.verified,
+      createdAt: new Date(r.created_at * 1000).toISOString(),
     })),
-    total: subscribers.length,
-  });
-});
+    total: results.length,
+  })
+})
 
-app.delete('/api/subscribers/:id', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+app.delete('/api/subscribers/:id', requireAuth, async (c) => {
+  await c.env.DB.prepare('DELETE FROM subscribers WHERE id = ?').bind(c.req.param('id')).run()
+  return c.json({ ok: true })
+})
 
-  const id = c.req.param('id');
-  const db = c.get('db');
+// ==========================================================================
+// UPLOAD (R2)
+// ==========================================================================
 
-  await db.deleteOne('subscribers', { _id: { $oid: id } });
+app.post('/api/upload', requireAuth, async (c) => {
+  const form = await c.req.formData()
+  const file = form.get('file')
+  if (!file || typeof file === 'string') return c.json({ error: 'No file uploaded' }, 400)
 
-  return c.json({ success: true });
-});
+  const f = file as unknown as File
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  if (!allowed.includes(f.type)) return c.json({ error: 'Invalid file type' }, 400)
 
-// ==================== DOMAINS ROUTES ====================
+  const buf = await f.arrayBuffer()
+  if (buf.byteLength > 10 * 1024 * 1024) return c.json({ error: 'File too large (max 10MB)' }, 400)
 
-app.post('/api/domains', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+  const ext = (f.name.split('.').pop() || 'bin').toLowerCase()
+  const filename = `${randomToken(12)}-${Date.now()}.${ext}`
+  await c.env.IMAGES.put(filename, buf, {
+    httpMetadata: { contentType: f.type },
+  })
 
-  const { domain } = await c.req.json();
-  if (!domain) return c.json({ error: 'Domain is required' }, 400);
+  const base = c.env.R2_PUBLIC_URL || new URL(c.req.url).origin + '/img'
+  return c.json({ url: `${base}/${filename}` })
+})
 
-  const db = c.get('db');
+// Serve R2 objects back through the Worker when no R2_PUBLIC_URL is set.
+app.get('/img/:key', async (c) => {
+  const key = c.req.param('key')
+  const obj = await c.env.IMAGES.get(key)
+  if (!obj) return c.notFound()
+  const headers = new Headers()
+  obj.writeHttpMetadata(headers)
+  headers.set('etag', obj.httpEtag)
+  headers.set('cache-control', 'public, max-age=31536000, immutable')
+  return new Response(obj.body, { headers })
+})
 
-  // Add to Vercel
-  const vercelRes = await fetch(
-    `https://api.vercel.com/v10/projects/${c.env.VERCEL_PROJECT_ID}/domains${c.env.VERCEL_TEAM_ID ? `?teamId=${c.env.VERCEL_TEAM_ID}` : ''}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${c.env.VERCEL_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name: domain }),
-    }
-  );
+// ==========================================================================
+// Static frontend fallback — hand everything non-/api and non-/img to ASSETS.
+// ==========================================================================
 
-  const vercelData = await vercelRes.json() as any;
+app.all('*', async (c) => {
+  return c.env.ASSETS.fetch(c.req.raw)
+})
 
-  await db.updateOne(
-    'site_settings',
-    { userId: user.id },
-    { $set: { customDomain: domain, domainStatus: vercelData.verified ? 'verified' : 'pending' } }
-  );
+// ==========================================================================
+// Helpers
+// ==========================================================================
 
-  return c.json({
-    success: true,
-    verified: vercelData.verified,
-    verification: vercelData.verification,
-  });
-});
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
 
-app.get('/api/domains/verify', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
+function isStrongPassword(s: string): boolean {
+  if (s.length < 12) return false
+  if (!/[a-z]/.test(s)) return false
+  if (!/[A-Z]/.test(s)) return false
+  if (!/[0-9]/.test(s)) return false
+  if (!/[^A-Za-z0-9]/.test(s)) return false
+  return true
+}
 
-  const domain = c.req.query('domain');
-  if (!domain) return c.json({ error: 'Domain is required' }, 400);
+async function authPeek(c: AppCtx) {
+  const cookie = readSessionCookie(c.req.header('cookie') ?? null)
+  if (!cookie) return null
+  const secret = await getSessionSecret(c)
+  if (!secret) return null
+  return verifySessionToken(cookie, secret)
+}
 
-  const vercelRes = await fetch(
-    `https://api.vercel.com/v9/projects/${c.env.VERCEL_PROJECT_ID}/domains/${domain}${c.env.VERCEL_TEAM_ID ? `?teamId=${c.env.VERCEL_TEAM_ID}` : ''}`,
-    {
-      headers: { Authorization: `Bearer ${c.env.VERCEL_TOKEN}` },
-    }
-  );
-
-  const vercelData = await vercelRes.json() as any;
-
-  if (vercelData.verified) {
-    const db = c.get('db');
-    await db.updateOne('site_settings', { userId: user.id }, { $set: { domainStatus: 'active' } });
-  }
-
-  return c.json({
-    verified: vercelData.verified,
-    verification: vercelData.verification,
-  });
-});
-
-app.delete('/api/domains', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const db = c.get('db');
-  const settings = await db.findOne('site_settings', { userId: user.id });
-
-  if (!settings?.customDomain) {
-    return c.json({ error: 'No custom domain configured' }, 404);
-  }
-
-  await fetch(
-    `https://api.vercel.com/v9/projects/${c.env.VERCEL_PROJECT_ID}/domains/${settings.customDomain}${c.env.VERCEL_TEAM_ID ? `?teamId=${c.env.VERCEL_TEAM_ID}` : ''}`,
-    {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${c.env.VERCEL_TOKEN}` },
-    }
-  );
-
-  await db.updateOne('site_settings', { userId: user.id }, { $set: { customDomain: null, domainStatus: null } });
-
-  return c.json({ success: true });
-});
-
-// ==================== UPLOAD ROUTES ====================
-
-app.post('/api/upload', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const formData = await c.req.formData();
-  const file = formData.get('file') as File;
-
-  if (!file) return c.json({ error: 'No file uploaded' }, 400);
-
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (!allowedTypes.includes(file.type)) {
-    return c.json({ error: 'Invalid file type' }, 400);
-  }
-
-  const buffer = await file.arrayBuffer();
-  const filename = `${crypto.randomUUID()}_${Date.now()}.${file.name.split('.').pop()}`;
-
-  await c.env.IMAGES.put(filename, buffer, {
-    httpMetadata: { contentType: file.type },
-  });
-
-  const publicUrl = `${c.env.R2_PUBLIC_URL}/${filename}`;
-
-  return c.json({ url: publicUrl });
-});
-
-app.post('/api/upload/presigned', authMiddleware, async (c) => {
-  const user = c.get('user');
-  if (!user) return c.json({ error: 'Not authenticated' }, 401);
-
-  const { filename, contentType } = await c.req.json();
-
-  const uniqueFilename = `${crypto.randomUUID()}_${Date.now()}_${filename}`;
-  const publicUrl = `${c.env.R2_PUBLIC_URL}/${uniqueFilename}`;
-
-  // For R2 direct upload, return the public URL and a signed URL would be generated
-  // In practice, you'd use R2's signed URL feature
-  return c.json({ publicUrl, filename: uniqueFilename });
-});
-
-export default app;
+export default app

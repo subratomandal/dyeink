@@ -1,30 +1,63 @@
-name = "dyeink-api"
+#:schema node_modules/wrangler/config-schema.json
+#
+# DyeInk — Cloudflare Worker + D1 + R2 + static Pages-style assets.
+# Everything you need for a working blog lives in one Worker.
+#
+# One-click deploy button (in the README) uses this file directly.
+# When someone forks the repo and clicks "Deploy to Cloudflare":
+#   1. Cloudflare creates a D1 database called "dyeink" and rewrites the ID below.
+#   2. Cloudflare creates the R2 bucket "dyeink-images".
+#   3. The Worker is deployed with the ASSETS binding pointing at platform/dist.
+#   4. On first request, the Worker applies migrations/0001_init.sql and seeds
+#      the admin row from APP_PASSWORD (or shows a setup form if unset).
+#
+# To do that deploy locally instead:
+#   wrangler login
+#   wrangler d1 create dyeink            # once — copy the id into this file
+#   wrangler r2 bucket create dyeink-images  # once
+#   wrangler d1 migrations apply dyeink  # creates tables
+#   wrangler secret put APP_PASSWORD     # optional, or use the setup form
+#   npm run deploy
+
+name = "dyeink"
 main = "src/worker.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-[vars]
-NODE_ENV = "production"
+# Cloudflare runs this before `wrangler deploy`. It builds the React SPA so
+# the [assets] directory below has something to serve. Re-runs are idempotent.
+[build]
+command = "cd ../platform && npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
 
-# Add your secrets via wrangler secret put
-# MONGODB_URI
-# AUTH0_DOMAIN
-# AUTH0_CLIENT_ID
-# AUTH0_CLIENT_SECRET
-# AUTH0_AUDIENCE
-# AUTH0_MANAGEMENT_API_TOKEN
-# R2_ACCOUNT_ID
-# R2_ACCESS_KEY_ID
-# R2_SECRET_ACCESS_KEY
-# R2_BUCKET_NAME
-# R2_PUBLIC_URL
-# VERCEL_TOKEN
-# VERCEL_PROJECT_ID
-# VERCEL_TEAM_ID
 
+# -------- Static frontend (platform/dist) served by the Worker --------
+# After `cd platform && npm run build`, Cloudflare serves those files for any
+# request that doesn't match /api/* or /img/*. This is why DyeInk is a single
+# deploy: one Worker, one URL, no separate Pages project.
+[assets]
+directory = "../platform/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# -------- D1: relational storage --------
+# Leave database_id as-is on the first `wrangler deploy`; wrangler will
+# rewrite the file. For the deploy button, Cloudflare provisions it.
+[[d1_databases]]
+binding = "DB"
+database_name = "dyeink"
+database_id = "__REPLACE_ON_FIRST_DEPLOY__"
+migrations_dir = "migrations"
+
+# -------- R2: image uploads --------
 [[r2_buckets]]
 binding = "IMAGES"
 bucket_name = "dyeink-images"
 
-[triggers]
-crons = []
+# -------- Worker runtime vars --------
+[vars]
+# Optional. Set via `wrangler secret put R2_PUBLIC_URL` instead if your R2
+# bucket has a custom domain — those values shouldn't be in git.
+
+[observability]
+enabled = true
+head_sampling_rate = 1

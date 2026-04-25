@@ -1,0 +1,97 @@
+name: Deploy to Cloudflare
+
+# Triggered on push to main OR manually from the GitHub UI.
+# After forking the repo, add these two secrets under Settings → Secrets and variables → Actions:
+#   CLOUDFLARE_API_TOKEN  (with "Edit Cloudflare Workers" template permissions + D1 + R2 read/write)
+#   CLOUDFLARE_ACCOUNT_ID
+# Optionally add APP_PASSWORD for the initial admin seed.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      app_password:
+        description: 'Optional APP_PASSWORD seed (will be set as Worker secret before deploy)'
+        required: false
+        type: string
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            platform/package-lock.json
+            backend/package-lock.json
+
+      - name: Install platform deps
+        working-directory: platform
+        run: npm install --legacy-peer-deps
+
+      - name: Build platform
+        working-directory: platform
+        run: npm run build
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm install
+
+      - name: Ensure D1 database exists
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Create if missing; tolerate already-exists.
+          npx wrangler d1 create dyeink || true
+          # Extract database_id and patch wrangler.toml for this run.
+          DB_ID=$(npx wrangler d1 list --json | node -e "
+            let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{
+              const rows = JSON.parse(s);
+              const hit = rows.find(r=>r.name==='dyeink');
+              if (!hit) { process.exit(2); }
+              console.log(hit.uuid);
+            })")
+          echo "DB_ID=$DB_ID"
+          sed -i "s/__REPLACE_ON_FIRST_DEPLOY__/$DB_ID/" wrangler.toml
+
+      - name: Ensure R2 bucket exists
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler r2 bucket create dyeink-images || true
+
+      - name: Apply D1 migrations
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 migrations apply dyeink --remote
+
+      - name: Seed APP_PASSWORD (if provided)
+        if: ${{ github.event.inputs.app_password != '' }}
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: echo "${{ github.event.inputs.app_password }}" | npx wrangler secret put APP_PASSWORD
+
+      - name: Deploy Worker
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
