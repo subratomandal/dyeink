@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createNativeStore } from '@/lib/nativeStore'
 import { postService } from '@/services/postService'
 import { settingsService, type SiteSettings } from '@/services/settingsService'
 import { statsService, type BasicStats } from '@/services/statsService'
@@ -28,7 +28,7 @@ interface AdminState {
 
 const CACHE_DURATION = 5 * 60 * 1000
 
-export const useAdminStore = create<AdminState>((set, get) => ({
+export const useAdminStore = createNativeStore<AdminState>((set, get) => ({
     posts: null,
     postsLoading: false,
     postsLastFetched: null,
@@ -41,15 +41,15 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         try {
             const fetched = await postService.getPosts()
             set({ posts: fetched, postsLastFetched: Date.now(), postsLoading: false })
-        } catch (e) {
-            console.error('Failed to fetch posts:', e)
+        } catch (error) {
+            console.error('Failed to fetch posts:', error)
             set({ postsLoading: false })
         }
     },
     invalidatePosts: () => set({ postsLastFetched: null }),
     deletePostFromCache: (id) => {
         const { posts } = get()
-        if (posts) set({ posts: posts.filter((p) => p.id !== id) })
+        if (posts) set({ posts: posts.filter((post) => post.id !== id) })
     },
 
     settings: null,
@@ -59,19 +59,17 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         const { settings, settingsLastFetched, settingsLoading } = get()
         if (settingsLoading) return
         const now = Date.now()
-        if (!force && settings && settingsLastFetched && now - settingsLastFetched < CACHE_DURATION)
-            return
+        if (!force && settings && settingsLastFetched && now - settingsLastFetched < CACHE_DURATION) return
         set({ settingsLoading: true })
         try {
             const fetched = await settingsService.getSettings()
             set({ settings: fetched, settingsLastFetched: Date.now(), settingsLoading: false })
-        } catch (e) {
-            console.error('Failed to fetch settings:', e)
+        } catch (error) {
+            console.error('Failed to fetch settings:', error)
             set({ settingsLoading: false })
         }
     },
-    updateSettingsInCache: (settings) =>
-        set({ settings, settingsLastFetched: Date.now() }),
+    updateSettingsInCache: (settings) => set({ settings, settingsLastFetched: Date.now() }),
 
     stats: null,
     statsLoading: false,
@@ -85,8 +83,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         try {
             const fetched = await statsService.getStats()
             set({ stats: fetched, statsLastFetched: Date.now(), statsLoading: false })
-        } catch (e) {
-            console.error('Failed to fetch stats:', e)
+        } catch (error) {
+            console.error('Failed to fetch stats:', error)
             set({ statsLoading: false })
         }
     },

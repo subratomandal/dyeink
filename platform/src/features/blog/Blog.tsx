@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Share2 } from 'lucide-react'
-import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import SubscribeModal from '@/components/common/ui/SubscribeModal'
@@ -11,6 +10,7 @@ import { postService } from '@/services/postService'
 import { settingsService, type SiteSettings } from '@/services/settingsService'
 import { statsService } from '@/services/statsService'
 import type { Post, PublicPost } from '@/types'
+import { formatDateShort } from '@/lib/date'
 
 const XIcon = ({ size = 20 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -518,7 +518,7 @@ function BlogArticle({
                         letterSpacing: '0.05em',
                     }}
                 >
-                    {post.publishedAt ? format(new Date(post.publishedAt), 'MMM d, yyyy') : null}
+                    {post.publishedAt ? formatDateShort(post.publishedAt) : null}
                 </div>
             </div>
         </article>

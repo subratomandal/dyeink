@@ -1,5 +1,5 @@
-import { create } from 'zustand'
 import apiClient from '@/lib/apiClient'
+import { createNativeStore } from '@/lib/nativeStore'
 
 interface AuthState {
     isAuthenticated: boolean
@@ -14,7 +14,7 @@ interface AuthState {
     logout: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = createNativeStore<AuthState>((set) => ({
     isAuthenticated: false,
     isLoading: false,
     hasChecked: false,
@@ -76,13 +76,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         try {
             await apiClient.post('/auth/logout')
         } catch {
-            /* swallow — we're logging out anyway */
+            /* swallow - local state is cleared either way */
         }
         set({ isAuthenticated: false, hasChecked: true, name: '', email: '' })
     },
 }))
 
-// 401 from anywhere → flip the store. Listens once at module load.
 if (typeof window !== 'undefined') {
     window.addEventListener('auth:unauthorized', () => {
         useAuthStore.setState({ isAuthenticated: false, isLoading: false, hasChecked: true })

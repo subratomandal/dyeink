@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react'
-import { motion } from 'framer-motion'
 interface DecryptedTextProps {
     text: string
     speed?: number
@@ -205,7 +204,7 @@ export default function DecryptedText({
             }
             : {}
     return (
-        <motion.span
+        <span
             className={parentClassName}
             ref={containerRef}
             style={styles.wrapper}
@@ -227,7 +226,6 @@ export default function DecryptedText({
                     )
                 })}
             </span>
-        </motion.span>
+        </span>
     )
 }
-

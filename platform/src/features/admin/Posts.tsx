@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
 import { Trash2, Edit2 } from 'lucide-react'
 import { postService } from '@/services/postService'
 import { useAdminStore } from '@/stores/adminStore'
@@ -27,6 +26,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { formatDateShort } from '@/lib/date'
 
 export default function Posts() {
     const { posts, postsLoading, deletePostFromCache, fetchPosts } = useAdminStore()
@@ -100,7 +100,7 @@ export default function Posts() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="py-6 align-middle text-sm text-muted-foreground">
-                                        {format(new Date(post.createdAt), 'MMM d, yyyy')}
+                                        {formatDateShort(post.createdAt)}
                                     </TableCell>
                                     <TableCell className="py-6 text-right align-middle">
                                         <div className="flex justify-end gap-2">

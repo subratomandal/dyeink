@@ -1,11 +1,10 @@
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { ArrowRight } from 'lucide-react'
-import { format } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAdminStore } from '@/stores/adminStore'
 import DashboardSkeleton from '@/components/admin/skeletons/DashboardSkeleton'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatDateKey, formatDateShort } from '@/lib/date'
 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
@@ -46,10 +45,9 @@ export default function Dashboard() {
                 d.setDate(d.getDate() - (6 - i))
                 return {
                     name: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-                    date: format(d, 'yyyy-MM-dd'),
+                    date: formatDateKey(d),
                     views: 0,
                     shares: 0,
-                    published: 0,
                 }
             })
         }
@@ -81,66 +79,7 @@ export default function Dashboard() {
                             {!ready ? null : 'No stats recorded yet'}
                         </div>
                     ) : (
-                        <ResponsiveContainer width="100%" height="100%" debounce={300}>
-                            <AreaChart data={graphData} margin={{ top: 10, right: 10, left: -45, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="dash_grad_views" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#00cbff" stopOpacity={0.2} />
-                                        <stop offset="95%" stopColor="#00cbff" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="dash_grad_pub" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    vertical={false}
-                                    stroke="hsl(var(--border))"
-                                />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    allowDecimals={false}
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                                    domain={[0, 'auto']}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'hsl(var(--popover))',
-                                        border: '1px solid hsl(var(--border))',
-                                        borderRadius: '8px',
-                                        color: 'hsl(var(--popover-foreground))',
-                                    }}
-                                    itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="published"
-                                    stroke="#8b5cf6"
-                                    strokeWidth={2}
-                                    fillOpacity={1}
-                                    fill="url(#dash_grad_pub)"
-                                    isAnimationActive={false}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="views"
-                                    stroke="#00cbff"
-                                    strokeWidth={2}
-                                    fillOpacity={1}
-                                    fill="url(#dash_grad_views)"
-                                    isAnimationActive={false}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        <NativeAreaChart data={graphData} />
                     )}
                 </div>
             </section>
@@ -156,7 +95,7 @@ export default function Dashboard() {
                                 </h3>
                                 <div className="flex items-center justify-between">
                                     <span className="font-heading text-xs text-muted-foreground">
-                                        {new Date(dashboardStats.latestPost.createdAt).toLocaleDateString('en-US')}
+                                        {formatDateShort(dashboardStats.latestPost.createdAt)}
                                     </span>
                                     <span className="flex items-center gap-1 font-heading text-sm text-foreground">
                                         View Post <ArrowRight className="h-4 w-4" />
@@ -182,5 +121,104 @@ export default function Dashboard() {
                 }
             `}</style>
         </div>
+    )
+}
+
+type ChartPoint = {
+    date: string
+    name?: string
+    views?: number
+    shares?: number
+}
+
+function NativeAreaChart({ data }: { data: ChartPoint[] }) {
+    const width = 720
+    const height = 300
+    const padding = { top: 16, right: 16, bottom: 36, left: 42 }
+    const innerWidth = width - padding.left - padding.right
+    const innerHeight = height - padding.top - padding.bottom
+    const values = data.flatMap((point) => [point.views || 0, point.shares || 0])
+    const maxValue = Math.max(1, ...values)
+
+    const xFor = (index: number) =>
+        padding.left + (data.length <= 1 ? innerWidth / 2 : (index / (data.length - 1)) * innerWidth)
+    const yFor = (value: number) => padding.top + innerHeight - (value / maxValue) * innerHeight
+    const linePath = (key: 'views' | 'shares') =>
+        data
+            .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(point[key] || 0)}`)
+            .join(' ')
+    const areaPath = (key: 'views' | 'shares') => {
+        const line = linePath(key)
+        return `${line} L ${xFor(data.length - 1)} ${padding.top + innerHeight} L ${xFor(0)} ${
+            padding.top + innerHeight
+        } Z`
+    }
+    const gridLines = Array.from({ length: 4 }, (_, index) => {
+        const ratio = index / 3
+        return padding.top + ratio * innerHeight
+    })
+    const labelStep = Math.max(1, Math.ceil(data.length / 5))
+
+    return (
+        <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="h-full w-full overflow-visible"
+            role="img"
+            aria-label="Views and shares over time"
+        >
+            <defs>
+                <linearGradient id="dash_grad_views" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00cbff" stopOpacity="0.22" />
+                    <stop offset="95%" stopColor="#00cbff" stopOpacity="0" />
+                </linearGradient>
+                <linearGradient id="dash_grad_shares" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity="0.18" />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity="0" />
+                </linearGradient>
+            </defs>
+
+            {gridLines.map((y, index) => (
+                <line
+                    key={index}
+                    x1={padding.left}
+                    x2={width - padding.right}
+                    y1={y}
+                    y2={y}
+                    stroke="hsl(var(--border))"
+                    strokeDasharray="3 3"
+                />
+            ))}
+
+            <path d={areaPath('shares')} fill="url(#dash_grad_shares)" />
+            <path d={areaPath('views')} fill="url(#dash_grad_views)" />
+            <path d={linePath('shares')} fill="none" stroke="#8b5cf6" strokeWidth="2" />
+            <path d={linePath('views')} fill="none" stroke="#00cbff" strokeWidth="2" />
+
+            {data.map((point, index) => (
+                <g key={`${point.date}-${index}`}>
+                    <circle cx={xFor(index)} cy={yFor(point.views || 0)} r="3" fill="#00cbff">
+                        <title>{`${point.name || point.date}: ${point.views || 0} views, ${point.shares || 0} shares`}</title>
+                    </circle>
+                    {index % labelStep === 0 || index === data.length - 1 ? (
+                        <text
+                            x={xFor(index)}
+                            y={height - 10}
+                            textAnchor="middle"
+                            fill="hsl(var(--muted-foreground))"
+                            fontSize="12"
+                        >
+                            {point.name || point.date}
+                        </text>
+                    ) : null}
+                </g>
+            ))}
+
+            <text x={padding.left} y={padding.top + 10} fill="hsl(var(--muted-foreground))" fontSize="12">
+                {maxValue.toLocaleString()}
+            </text>
+            <text x={padding.left} y={padding.top + innerHeight} fill="hsl(var(--muted-foreground))" fontSize="12">
+                0
+            </text>
+        </svg>
     )
 }

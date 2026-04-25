@@ -1,47 +1,103 @@
-import { toast as sonnerToast } from 'sonner'
-import { Toaster as SonnerToaster } from '@/components/ui/sonner'
+import { useSyncExternalStore } from 'react'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
 export interface ToastInput {
-  type: ToastType
-  message: string
-  duration?: number
-  action?: { label: string; onClick: () => void }
+    type: ToastType
+    message: string
+    duration?: number
+    action?: { label: string; onClick: () => void }
 }
 
-/**
- * Compatibility shim. Existing call sites use:
- *   const { addToast } = useToast()
- *   addToast({ type: 'error', message: '...' })
- *
- * Under the hood this now routes through Sonner, so we get proper
- * stacking, accessibility, and theming for free.
- */
+type ToastRecord = ToastInput & { id: number }
+
+let nextId = 1
+let toasts: ToastRecord[] = []
+const listeners = new Set<() => void>()
+const timers = new Map<number, number>()
+
+function emit() {
+    listeners.forEach((listener) => listener())
+}
+
+function subscribe(listener: () => void) {
+    listeners.add(listener)
+    return () => listeners.delete(listener)
+}
+
+function removeToast(id: number) {
+    const timer = timers.get(id)
+    if (timer) window.clearTimeout(timer)
+    timers.delete(id)
+    toasts = toasts.filter((toast) => toast.id !== id)
+    emit()
+}
+
+export function addToast(input: ToastInput) {
+    const id = nextId++
+    const record = { ...input, id }
+    toasts = [...toasts, record].slice(-5)
+    emit()
+
+    if (input.duration !== Infinity) {
+        timers.set(id, window.setTimeout(() => removeToast(id), input.duration ?? 4000))
+    }
+}
+
 export function useToast() {
-  return {
-    addToast: ({ type, message, duration, action }: ToastInput) => {
-      const opts: Parameters<typeof sonnerToast>[1] = {
-        duration: duration === Infinity ? Infinity : duration,
-        action: action ? { label: action.label, onClick: action.onClick } : undefined,
-      }
-      switch (type) {
-        case 'success':
-          sonnerToast.success(message, opts)
-          break
-        case 'error':
-          sonnerToast.error(message, opts)
-          break
-        case 'warning':
-          sonnerToast.warning(message, opts)
-          break
-        default:
-          sonnerToast(message, opts)
-      }
-    },
-  }
+    return { addToast }
 }
 
-export const ToastContainer = () => <SonnerToaster position="bottom-right" richColors closeButton />
+export function ToastContainer() {
+    const currentToasts = useSyncExternalStore(subscribe, () => toasts, () => [])
 
-export { sonnerToast as toast }
+    return (
+        <div
+            aria-live="polite"
+            aria-atomic="false"
+            className="fixed bottom-4 right-4 z-[10000] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-3"
+        >
+            {currentToasts.map((toast) => (
+                <div
+                    key={toast.id}
+                    role={toast.type === 'error' ? 'alert' : 'status'}
+                    className={`rounded-lg border bg-background px-4 py-3 text-sm text-foreground shadow-lg toast-${toast.type}`}
+                >
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <p className="m-0 font-medium">{toast.message}</p>
+                            {toast.action ? (
+                                <button
+                                    type="button"
+                                    className="mt-2 text-xs font-semibold underline underline-offset-4"
+                                    onClick={() => {
+                                        toast.action?.onClick()
+                                        removeToast(toast.id)
+                                    }}
+                                >
+                                    {toast.action.label}
+                                </button>
+                            ) : null}
+                        </div>
+                        <button
+                            type="button"
+                            className="text-muted-foreground transition-colors hover:text-foreground"
+                            aria-label="Dismiss notification"
+                            onClick={() => removeToast(toast.id)}
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            ))}
+            <style>{`
+                .toast-success { border-color: rgb(16 185 129 / 0.35); }
+                .toast-error { border-color: rgb(239 68 68 / 0.45); }
+                .toast-warning { border-color: rgb(245 158 11 / 0.45); }
+                .toast-info { border-color: hsl(var(--border)); }
+            `}</style>
+        </div>
+    )
+}
+
+export const toast = addToast

@@ -28,9 +28,7 @@ export const postService = {
             const compressed = await compressImage(file)
             const formData = new FormData()
             formData.append('file', compressed)
-            const response = await apiClient.post('/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            })
+            const response = await apiClient.post('/upload', formData)
             return response.data.url
         } catch (error) {
             console.error('Upload failed:', error)

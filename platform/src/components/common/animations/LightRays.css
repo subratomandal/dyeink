@@ -5,4 +5,70 @@
     pointer-events: none;
     z-index: 3;
     overflow: hidden;
-} 
+    filter: saturate(var(--ray-saturation));
+}
+
+.light-rays-container::before,
+.light-rays-container::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    opacity: var(--ray-fade);
+    transform-origin: var(--ray-origin-x) var(--ray-origin-y);
+    animation: light-rays-drift var(--ray-speed) ease-in-out infinite alternate;
+    will-change: transform, opacity;
+}
+
+.light-rays-container::before {
+    background:
+        conic-gradient(
+            from calc(205deg + var(--ray-distortion)) at var(--ray-origin-x) var(--ray-origin-y),
+            transparent 0deg,
+            color-mix(in srgb, var(--ray-color) 58%, transparent) var(--ray-spread-inner),
+            transparent var(--ray-spread),
+            transparent 360deg
+        ),
+        radial-gradient(
+            ellipse var(--ray-length) 42% at var(--ray-origin-x) var(--ray-origin-y),
+            color-mix(in srgb, var(--ray-color) 36%, transparent),
+            transparent 72%
+        );
+}
+
+.light-rays-container::after {
+    opacity: calc(var(--ray-fade) * 0.55 + var(--ray-noise));
+    background:
+        radial-gradient(
+            ellipse 70% 35% at var(--ray-mouse-x) var(--ray-mouse-y),
+            color-mix(in srgb, var(--ray-color) 20%, transparent),
+            transparent 68%
+        ),
+        repeating-linear-gradient(
+            112deg,
+            color-mix(in srgb, var(--ray-color) 12%, transparent) 0 1px,
+            transparent 1px 18px
+        );
+    mix-blend-mode: screen;
+}
+
+.light-rays-pulse::before {
+    animation-name: light-rays-drift, light-rays-pulse;
+}
+
+@keyframes light-rays-drift {
+    from {
+        transform: translate3d(-1.5%, -1%, 0) rotate(-1deg);
+    }
+    to {
+        transform: translate3d(1.5%, 1%, 0) rotate(1deg);
+    }
+}
+
+@keyframes light-rays-pulse {
+    from {
+        opacity: calc(var(--ray-fade) * 0.62);
+    }
+    to {
+        opacity: var(--ray-fade);
+    }
+}
