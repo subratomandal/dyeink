@@ -109,10 +109,11 @@ flowchart TB
 
 1. Click the button. Cloudflare clones the repo into your account
 2. Cloudflare runs `npm run build`, then reads the root `wrangler.toml` and uploads the Worker
-3. D1 (`dyeink`) and R2 (`dyeink-images`) are auto-provisioned the first time
+3. D1 (`dyeink`) and R2 (`dyeink-images`) are auto-provisioned the first time because no D1 `database_id` is committed
 4. Open the generated `https://dyeink.<account>.workers.dev` URL
-5. The setup form prompts you for an admin password (12+ chars, mixed case, number, symbol)
-6. You're in — head to the dashboard and start writing
+5. The Worker initializes the D1 schema on first API request
+6. The setup form prompts you for an admin password (12+ chars, mixed case, number, symbol)
+7. You're in — head to the dashboard and start writing
 
 #### Cloudflare Pages (Git-connected)
 
@@ -148,18 +149,13 @@ cd dyeink
 cd platform && npm install --legacy-peer-deps && cd ..
 cd backend && npm install && cd ..
 
-# Provision D1 + R2 (one-time)
+# Deploy; Wrangler auto-provisions D1 + R2 if they do not exist yet
 cd backend
 npx wrangler login
-npx wrangler d1 create dyeink
-# Paste the database_id into backend/wrangler.toml at __REPLACE_ON_FIRST_DEPLOY__
-npx wrangler r2 bucket create dyeink-images
-npx wrangler d1 migrations apply dyeink --remote
 
 # Optional: skip the setup wizard by seeding the password
 npx wrangler secret put APP_PASSWORD
 
-# Deploy
 npm run deploy
 ```
 
@@ -201,8 +197,8 @@ D1 + R2 binding names live in `wrangler.toml` and are not env vars.
 #### Cloudflare D1
 
 1. The `[[d1_databases]]` block in `wrangler.toml` declares a database named `dyeink`
-2. The Workers Deploy button or `npx wrangler d1 create dyeink` provisions it
-3. Migrations under `backend/migrations/` run automatically via `wrangler d1 migrations apply`
+2. Wrangler auto-provisions it on first Workers deploy because no `database_id` is committed
+3. The Worker runs the initial schema idempotently on first API request; migrations under `backend/migrations/` remain available for explicit database management
 4. Free tier covers 5 GB and 5 M reads/day per account
 
 #### Cloudflare R2

@@ -213,7 +213,7 @@
 }
 
 /* ==============================================================
-   Rich post content (Quill output). Tailwind's `prose` plugin
+   Rich post content. Tailwind's `prose` plugin
    could replace this, but keeping custom rules for now to match
    the existing published-post look.
    ============================================================== */

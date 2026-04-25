@@ -3,13 +3,8 @@
 # DyeInk — Cloudflare Worker + D1 + R2 + static Pages-style assets.
 # Everything you need for a working blog lives in one Worker.
 #
-# One-click deploy button (in the README) uses this file directly.
-# When someone forks the repo and clicks "Deploy to Cloudflare":
-#   1. Cloudflare creates a D1 database called "dyeink" and rewrites the ID below.
-#   2. Cloudflare creates the R2 bucket "dyeink-images".
-#   3. The Worker is deployed with the ASSETS binding pointing at platform/dist.
-#   4. On first request, the Worker applies migrations/0001_init.sql and seeds
-#      the admin row from APP_PASSWORD (or shows a setup form if unset).
+# Manual backend-local deploy config. The root wrangler.toml is used by the
+# Deploy to Cloudflare button.
 #
 # To do that deploy locally instead:
 #   wrangler login
@@ -40,12 +35,10 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 # -------- D1: relational storage --------
-# Leave database_id as-is on the first `wrangler deploy`; wrangler will
-# rewrite the file. For the deploy button, Cloudflare provisions it.
+# No database_id is committed. Wrangler auto-provisions D1 on first deploy.
 [[d1_databases]]
 binding = "DB"
 database_name = "dyeink"
-database_id = "__REPLACE_ON_FIRST_DEPLOY__"
 migrations_dir = "migrations"
 
 # -------- R2: image uploads --------

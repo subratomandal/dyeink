@@ -21,7 +21,6 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "dyeink"
-database_id = "__REPLACE_ON_FIRST_DEPLOY__"
 migrations_dir = "backend/migrations"
 
 # -------- R2: image uploads --------

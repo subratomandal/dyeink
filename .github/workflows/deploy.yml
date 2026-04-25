@@ -65,7 +65,8 @@ jobs:
               console.log(hit.uuid);
             })")
           echo "DB_ID=$DB_ID"
-          sed -i "s/__REPLACE_ON_FIRST_DEPLOY__/$DB_ID/" wrangler.toml
+          export DB_ID
+          node -e 'const fs = require("fs"); const p = "wrangler.toml"; const id = process.env.DB_ID; let s = fs.readFileSync(p, "utf8"); if (/database_id\s*=/.test(s)) { s = s.replace(/database_id\s*=\s*"[^"]*"/, `database_id = "${id}"`); } else { s = s.replace(/database_name\s*=\s*"dyeink"\n/, `database_name = "dyeink"\ndatabase_id = "${id}"\n`); } fs.writeFileSync(p, s);'
 
       - name: Ensure R2 bucket exists
         working-directory: backend

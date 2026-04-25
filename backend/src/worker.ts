@@ -100,12 +100,97 @@ async function isRateLimited(db: D1Database, ip: string): Promise<boolean> {
 
 // ---------- Setup / bootstrap ----------
 
+const INIT_SCHEMA_STATEMENTS = [
+  `CREATE TABLE IF NOT EXISTS admin (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  password_hash TEXT NOT NULL,
+  session_secret TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);`,
+
+  `CREATE TABLE IF NOT EXISTS site_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  site_name TEXT NOT NULL DEFAULT 'My Blog',
+  site_description TEXT NOT NULL DEFAULT '',
+  author_name TEXT NOT NULL DEFAULT '',
+  author_email TEXT NOT NULL DEFAULT '',
+  newsletter_enabled INTEGER NOT NULL DEFAULT 0,
+  twitter_link TEXT,
+  linkedin_link TEXT,
+  github_link TEXT,
+  website_link TEXT,
+  dribbble_link TEXT,
+  huggingface_link TEXT,
+  leetcode_link TEXT,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);`,
+
+  `CREATE TABLE IF NOT EXISTS posts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  content TEXT NOT NULL DEFAULT '',
+  excerpt TEXT NOT NULL DEFAULT '',
+  cover_image TEXT,
+  published INTEGER NOT NULL DEFAULT 0,
+  published_at INTEGER,
+  views INTEGER NOT NULL DEFAULT 0,
+  shares INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+);`,
+
+  'CREATE INDEX IF NOT EXISTS idx_posts_published ON posts(published, published_at DESC);',
+  'CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);',
+
+  `CREATE TABLE IF NOT EXISTS subscribers (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  verified INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);`,
+
+  `CREATE TABLE IF NOT EXISTS daily_stats (
+  post_id TEXT NOT NULL,
+  day_utc INTEGER NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  shares INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (post_id, day_utc),
+  FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+);`,
+
+  `CREATE TABLE IF NOT EXISTS login_attempts (
+  ip TEXT NOT NULL,
+  attempted_at INTEGER NOT NULL,
+  success INTEGER NOT NULL DEFAULT 0
+);`,
+  'CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip, attempted_at);',
+]
+
+let schemaReady: Promise<void> | null = null
+
+function ensureSchema(db: D1Database): Promise<void> {
+  schemaReady ??= db.batch(INIT_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement))).then(
+    () => undefined,
+    (err) => {
+      schemaReady = null
+      throw err
+    },
+  )
+  return schemaReady
+}
+
 /**
- * On first request, seed the admin row from APP_PASSWORD if present.
+ * On first request, initialize the schema and seed the admin row from APP_PASSWORD if present.
  * If APP_PASSWORD isn't set, GET /api/setup/status returns { initialized: false }
  * and the UI shows a setup form.
  */
 async function ensureBootstrap(c: AppCtx) {
+  await ensureSchema(c.env.DB)
+
   const row = await c.env.DB.prepare('SELECT id FROM admin WHERE id = 1').first()
   if (row) return
 

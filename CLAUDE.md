@@ -87,8 +87,8 @@ The README has the user-facing deploy walkthrough. From a maintainer's perspecti
 - `[assets].directory = "platform/dist"` is what binds the built SPA into the Worker's `c.env.ASSETS` fetcher
 - `backend/wrangler.toml` is still useful for manual backend-local deploys via `cd backend && npm run deploy`
 - `wrangler.pages.toml` is a reference config for Git-connected Pages deployments; Pages projects must not run `npx wrangler deploy`
-- `database_id` in `wrangler.toml` is `__REPLACE_ON_FIRST_DEPLOY__` initially. On first `wrangler deploy`, wrangler asks if it should patch the file with the real ID. The Cloudflare Deploy button does the same thing automatically
-- `.github/workflows/deploy.yml` provisions D1/R2 via `wrangler d1 create` / `wrangler r2 bucket create` (idempotent), patches the database_id at runtime, applies migrations, and deploys. Auto-runs on push to `main`
+- D1 `database_id` is intentionally omitted in `wrangler.toml`; Wrangler's automatic provisioning creates the database on first deploy, and `ensureSchema` in the Worker initializes tables on first API request
+- `.github/workflows/deploy.yml` provisions D1/R2 via `wrangler d1 create` / `wrangler r2 bucket create` (idempotent), patches the temporary checkout with the D1 ID, applies migrations, and deploys. Auto-runs on push to `main`
 
 ## Environment
 
