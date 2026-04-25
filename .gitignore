@@ -8,6 +8,9 @@ dist
 .vscode
 .DS_Store
 .claude
+CLAUDE.md
+claude.md
+temporary.md
 
 # Shell config files (should not be in repo)
 .zshrc*

@@ -5,7 +5,7 @@ import path from 'path'
 const manualChunkGroups: Record<string, string[]> = {
     'vendor-react': ['react', 'react-dom', 'react-router-dom'],
     'vendor-ui': ['framer-motion', 'lucide-react', 'recharts', 'clsx', 'tailwind-merge'],
-    'vendor-3d': ['three', 'ogl', 'postprocessing', 'gsap'],
+    'vendor-3d': ['ogl'],
     'vendor-utils': ['date-fns', 'dompurify', 'zustand', 'axios', 'sonner'],
 }
 
