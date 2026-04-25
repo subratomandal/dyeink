@@ -71,7 +71,7 @@ export default function Posts() {
                         <div className="text-right">Actions</div>
                     </div>
 
-                    <div className="divide-y divide-border">
+                    <div className="posts-list divide-border md:divide-y">
                         {filteredPosts.map((post, index) => (
                             <article
                                 key={post.id}
@@ -161,8 +161,12 @@ export default function Posts() {
                         padding-bottom: 2rem !important;
                     }
                     .post-row {
+                        border: 0 !important;
                         border-radius: 1rem;
                         padding: 1rem 0.25rem !important;
+                    }
+                    .posts-list > :not([hidden]) ~ :not([hidden]) {
+                        border-top-width: 0 !important;
                     }
                     .post-title-link {
                         display: -webkit-box !important;

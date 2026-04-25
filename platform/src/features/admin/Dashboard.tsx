@@ -62,13 +62,13 @@ export default function Dashboard() {
     if (showLoader) return <DashboardSkeleton />
 
     return (
-        <div className="animate-fade-in pb-16">
-            <div className="mb-8 flex items-center justify-between">
+        <div className="dashboard-page animate-fade-in pb-16">
+            <div className="dashboard-header mb-8 flex items-center justify-between">
                 <h1 className="m-0 font-heading text-[2rem] font-semibold leading-tight sm:text-4xl">Dashboard</h1>
             </div>
 
-            <section className="mb-12">
-                <h2 className="mb-6 text-lg font-semibold text-muted-foreground sm:text-xl">Analytics</h2>
+            <section className="dashboard-section mb-12">
+                <h2 className="dashboard-section-title mb-6 text-lg font-semibold text-muted-foreground sm:text-xl">Analytics</h2>
 
                 <div className="mb-8 flex gap-8 dashboard-stats-row">
                     <Stat label="Total Views" value={(stats?.totalViews || 0).toLocaleString()} />
@@ -76,8 +76,8 @@ export default function Dashboard() {
                     <Stat label="Published" value={dashboardStats.publishedPosts.toString()} />
                 </div>
 
-                <Card className="overflow-hidden border-0 bg-transparent shadow-none">
-                    <CardContent className="px-0 py-3 sm:py-6">
+                <Card className="dashboard-chart-card overflow-hidden border-0 bg-transparent shadow-none">
+                    <CardContent className="dashboard-chart-content px-0 py-3 sm:py-6">
                         <div className="dashboard-chart-frame h-[280px] w-full min-w-0 overflow-hidden sm:h-[390px]">
                             {!ready || graphData.length === 0 ? (
                                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -91,8 +91,8 @@ export default function Dashboard() {
                 </Card>
             </section>
 
-            <div className="mb-8">
-                <h2 className="mb-5 text-lg font-semibold text-muted-foreground sm:text-xl">Latest Post</h2>
+            <div className="dashboard-latest-section mb-8">
+                <h2 className="dashboard-latest-title mb-5 text-lg font-semibold text-muted-foreground sm:text-xl">Latest Post</h2>
                 {dashboardStats.latestPost ? (
                     <Link
                         to={`/blog/${dashboardStats.latestPost.slug}`}
@@ -100,12 +100,12 @@ export default function Dashboard() {
                         rel="noopener noreferrer"
                         className="block no-underline"
                     >
-                        <Card className="border-border bg-transparent shadow-none transition-colors hover:border-foreground">
-                            <CardContent className="p-5 sm:p-6">
-                                <h3 className="mb-4 break-words font-heading text-[1.35rem] font-normal leading-tight tracking-tight text-foreground sm:text-2xl">
+                        <Card className="dashboard-latest-card border-border bg-transparent shadow-none transition-colors hover:border-foreground">
+                            <CardContent className="dashboard-latest-content p-5 sm:p-6">
+                                <h3 className="dashboard-latest-heading mb-4 break-words font-heading text-[1.35rem] font-normal leading-tight tracking-tight text-foreground sm:text-2xl">
                                     {dashboardStats.latestPost.title}
                                 </h3>
-                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="dashboard-latest-meta flex flex-wrap items-center justify-between gap-3">
                                     <span className="font-heading text-xs text-muted-foreground">
                                         {formatDateShort(dashboardStats.latestPost.createdAt)}
                                     </span>
@@ -117,8 +117,8 @@ export default function Dashboard() {
                         </Card>
                     </Link>
                 ) : (
-                    <Card className="border-border bg-transparent shadow-none">
-                        <CardContent className="p-6">
+                    <Card className="dashboard-latest-card border-border bg-transparent shadow-none">
+                        <CardContent className="dashboard-latest-content p-6">
                             <div className="text-center text-muted-foreground">
                                 No posts yet.{' '}
                                 <Link to="/admin/posts/new" className="text-foreground underline">
@@ -132,34 +132,72 @@ export default function Dashboard() {
 
             <style>{`
                 @media (max-width: 640px) {
+                    .dashboard-page {
+                        padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+                    }
+                    .dashboard-header {
+                        margin-bottom: 1.05rem !important;
+                    }
+                    .dashboard-header h1 {
+                        font-size: clamp(1.75rem, 8vw, 2rem) !important;
+                    }
+                    .dashboard-section {
+                        margin-bottom: 1.35rem !important;
+                    }
+                    .dashboard-section-title,
+                    .dashboard-latest-title {
+                        margin-bottom: 0.9rem !important;
+                        font-size: 1rem !important;
+                        line-height: 1.25 !important;
+                    }
                     .dashboard-stats-row {
                         display: grid !important;
                         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                        gap: 0.65rem !important;
-                        margin-bottom: 1.25rem !important;
+                        gap: 0.55rem !important;
+                        margin-bottom: 0.9rem !important;
+                        align-items: start !important;
                     }
                     .dashboard-stat {
                         min-width: 0;
-                        padding: 0.2rem 0 !important;
+                        padding: 0.35rem 0 !important;
                     }
                     .dashboard-stat > div:first-child {
-                        min-height: 2.1em;
+                        min-height: 2.15em;
                         font-size: 0.62rem !important;
                         letter-spacing: 0.08em !important;
+                        line-height: 1.1 !important;
+                        margin-bottom: 0.45rem !important;
                     }
                     .dashboard-stat > div:last-child {
-                        font-size: clamp(1.55rem, 8vw, 2.1rem) !important;
+                        font-size: clamp(1.45rem, 7.6vw, 2rem) !important;
+                    }
+                    .dashboard-chart-content {
+                        padding-top: 0.35rem !important;
+                        padding-bottom: 0.4rem !important;
                     }
                     .dashboard-chart-frame {
-                        height: clamp(360px, 78vw, 430px) !important;
-                        margin-left: -0.35rem !important;
-                        width: calc(100% + 0.35rem) !important;
+                        height: clamp(330px, 74vw, 400px) !important;
+                        margin-left: 0 !important;
+                        width: 100% !important;
                     }
                     .dashboard-chart-frame svg {
                         height: 100% !important;
                         min-width: 0 !important;
-                        transform: scale(1.08);
+                        transform: scale(1.04);
                         transform-origin: left center;
+                    }
+                    .dashboard-latest-section {
+                        margin-bottom: 0 !important;
+                    }
+                    .dashboard-latest-content {
+                        padding: 1rem !important;
+                    }
+                    .dashboard-latest-heading {
+                        margin-bottom: 0.85rem !important;
+                        font-size: 1.2rem !important;
+                    }
+                    .dashboard-latest-meta {
+                        gap: 0.7rem !important;
                     }
                 }
             `}</style>
@@ -240,13 +278,6 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                     <stop offset="100%" stopColor="#a855f7" />
                 </linearGradient>
             </defs>
-
-            <g transform={`translate(${width - padding.right - 208} 12)`}>
-                <circle cx="7" cy="7" r="6" fill="#ec4899" />
-                <text x="22" y="12" fill="hsl(var(--muted-foreground))" fontSize="16" fontWeight="700">Views</text>
-                <line x1="96" x2="122" y1="7" y2="7" stroke="#8b5cf6" strokeWidth="5" strokeLinecap="round" />
-                <text x="136" y="12" fill="hsl(var(--muted-foreground))" fontSize="16" fontWeight="700">Shares</text>
-            </g>
 
             {yTicks.map((tick) => (
                 <g key={tick}>

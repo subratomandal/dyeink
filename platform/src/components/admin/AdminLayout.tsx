@@ -149,7 +149,7 @@ export default function AdminLayout() {
                 <div className="admin-sidebar-iridescence">
                     <Iridescence
                         color={[0.23921568627450981, 0.24705882352941178, 0.25098039215686274]}
-                        mouseReact
+                        mouseReact={false}
                         amplitude={0.04}
                         speed={0.08}
                     />
@@ -248,7 +248,22 @@ export default function AdminLayout() {
                 }
                 @media (max-width: 640px) {
                     .admin-sidebar-iridescence {
-                        display: none !important;
+                        display: block !important;
+                        inset: 0 !important;
+                        opacity: 0.36;
+                    }
+                    .admin-sidebar-iridescence::after {
+                        background:
+                            linear-gradient(180deg, hsl(var(--card) / 0.78), hsl(var(--background) / 0.72)),
+                            radial-gradient(90% 150% at 50% 0%, hsl(var(--foreground) / 0.08), transparent 58%);
+                    }
+                    .dark .admin-sidebar-iridescence {
+                        opacity: 0.46;
+                    }
+                    .dark .admin-sidebar-iridescence::after {
+                        background:
+                            linear-gradient(180deg, rgb(8 8 8 / 0.7), rgb(8 8 8 / 0.82)),
+                            radial-gradient(90% 150% at 50% 0%, rgb(255 255 255 / 0.1), transparent 58%);
                     }
                     aside {
                         top: auto !important;

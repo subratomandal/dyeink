@@ -8,7 +8,7 @@ export default function PostsSkeleton() {
                 <Skeleton className="h-5 w-48 rounded-full" />
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-border bg-transparent">
+            <div className="posts-skeleton-panel overflow-hidden rounded-2xl border border-border bg-transparent">
                 <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_92px] border-b border-border bg-transparent px-5 py-3 md:grid">
                     <Skeleton className="h-3 w-14 rounded-full" />
                     <Skeleton className="h-3 w-16 rounded-full" />
@@ -16,7 +16,7 @@ export default function PostsSkeleton() {
                     <Skeleton className="ml-auto h-3 w-14 rounded-full" />
                 </div>
 
-                <div className="divide-y divide-border">
+                <div className="posts-skeleton-list divide-border md:divide-y">
                     {[1, 2, 3, 4, 5].map((i) => (
                         <div
                             key={i}
@@ -45,6 +45,17 @@ export default function PostsSkeleton() {
                     ))}
                 </div>
             </div>
+
+            <style>{`
+                @media (max-width: 767px) {
+                    .posts-skeleton-panel {
+                        border-width: 0 !important;
+                    }
+                    .posts-skeleton-list > :not([hidden]) ~ :not([hidden]) {
+                        border-top-width: 0 !important;
+                    }
+                }
+            `}</style>
         </div>
     )
 }
