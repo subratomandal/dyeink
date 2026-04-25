@@ -204,3 +204,59 @@ Verification:
 - `npm ci --legacy-peer-deps --dry-run` passed.
 - `npm run build` passed.
 - `cd backend && npm run typecheck` passed.
+
+## Follow-Up: GitHub Actions Missing Cloudflare API Token Failure
+
+User deploy failure on 2026-04-25:
+- Build and Worker bundling succeeded.
+- The next GitHub Actions step failed at `npx wrangler d1 create dyeink`.
+- Wrangler reported that `CLOUDFLARE_API_TOKEN` was missing in a non-interactive environment.
+- The following `wrangler d1 list --json` returned no JSON, causing `SyntaxError: Unexpected end of JSON input`.
+
+Cause:
+- GitHub repository secrets are not available or not configured for `CLOUDFLARE_API_TOKEN` and/or `CLOUDFLARE_ACCOUNT_ID`.
+- The workflow attempted Cloudflare provisioning even when those secrets were empty.
+
+Fix:
+- Added a `Check Cloudflare deploy credentials` workflow step.
+- If either required secret is missing, the workflow now completes the build and skips Cloudflare provisioning/deploy with an explicit warning.
+- All Wrangler steps now run only when both Cloudflare secrets are present.
+- Hardened D1 database lookup by capturing `wrangler d1 list --json` before parsing and using `set -euo pipefail`, so Wrangler failures do not become misleading JSON parse errors.
+
+Required for real deployment:
+- Add GitHub repository secret `CLOUDFLARE_API_TOKEN`.
+- Add GitHub repository secret `CLOUDFLARE_ACCOUNT_ID`.
+
+Verification:
+- `npm run build` passed.
+- `cd backend && npm run typecheck` passed.
+- `git diff --check` passed.
+- `.github/workflows/deploy.yml` parsed as valid YAML.
+
+## Follow-Up: Proactive GitHub Actions Deploy Hardening
+
+User request on 2026-04-25:
+- Solve the next probable deploy errors in the GitHub Actions workflow.
+
+Probable errors addressed:
+- Invalid Cloudflare token/account would fail later during D1/R2/deploy with less helpful messages.
+- `wrangler d1 create dyeink || true` could hide real permission/API failures.
+- `wrangler r2 bucket create dyeink-images || true` could hide real permission/API failures.
+- Newly-created Cloudflare resources can take a moment to appear before the next step uses them.
+- `wrangler secret put APP_PASSWORD` can fail on a first deployment if it runs before the Worker service exists.
+- The comment said `APP_PASSWORD` can be a repository secret, but the workflow only used manual dispatch input.
+
+Fix:
+- Added an explicit `npx wrangler whoami --account "$CLOUDFLARE_ACCOUNT_ID"` validation step.
+- D1 setup now lists first, creates only when missing, retries after create, and fails clearly if no database id is available.
+- R2 setup now checks bucket info first, creates only when missing, retries after create, and fails clearly if the bucket is unavailable.
+- Removed `|| true` from D1/R2 provisioning paths so permission/API errors do not get swallowed.
+- Moved `APP_PASSWORD` seeding after `wrangler deploy`.
+- `APP_PASSWORD` can now come from either manual workflow input or the `APP_PASSWORD` repository secret.
+
+Verification:
+- `npm run build` passed.
+- `cd backend && npm run typecheck` passed.
+- `git diff --check` passed.
+- `.github/workflows/deploy.yml` parsed as valid YAML.
+- Every workflow `run:` block passed `bash -n`.

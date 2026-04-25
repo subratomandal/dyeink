@@ -4,7 +4,8 @@ name: Deploy to Cloudflare
 # After forking the repo, add these two secrets under Settings → Secrets and variables → Actions:
 #   CLOUDFLARE_API_TOKEN  (with "Edit Cloudflare Workers" template permissions + D1 + R2 read/write)
 #   CLOUDFLARE_ACCOUNT_ID
-# Optionally add APP_PASSWORD for the initial admin seed.
+# Optionally add APP_PASSWORD as a repository secret, or pass it when running
+# workflow_dispatch, for the initial admin seed.
 
 on:
   push:
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       app_password:
-        description: 'Optional APP_PASSWORD seed (will be set as Worker secret before deploy)'
+        description: 'Optional APP_PASSWORD seed (will be set as Worker secret after deploy)'
         required: false
         type: string
 
@@ -41,51 +42,127 @@ jobs:
         working-directory: platform
         run: npm run build
 
+      - name: Check Cloudflare deploy credentials
+        id: cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Cloudflare deploy skipped. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in GitHub repository secrets to enable deployment."
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate Cloudflare account access
+        if: steps.cloudflare.outputs.deploy == 'true'
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler whoami --account "$CLOUDFLARE_ACCOUNT_ID"
+
       - name: Ensure D1 database exists
+        if: steps.cloudflare.outputs.deploy == 'true'
         working-directory: backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          # Create if missing; tolerate already-exists.
-          npx wrangler d1 create dyeink || true
-          # Extract database_id and patch wrangler.toml for this run.
-          DB_ID=$(npx wrangler d1 list --json | node -e "
-            let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{
-              const rows = JSON.parse(s);
-              const hit = rows.find(r=>r.name==='dyeink');
-              if (!hit) { process.exit(2); }
-              console.log(hit.uuid);
-            })")
+          set -euo pipefail
+
+          get_db_id() {
+            DB_JSON="$(npx wrangler d1 list --json)"
+            DB_JSON="$DB_JSON" node -e "
+              const rows = JSON.parse(process.env.DB_JSON || '[]');
+              const hit = rows.find((r) => r.name === 'dyeink');
+              if (hit?.uuid) {
+                console.log(hit.uuid);
+              }
+            "
+          }
+
+          DB_ID="$(get_db_id)"
+          if [ -z "$DB_ID" ]; then
+            npx wrangler d1 create dyeink
+            for attempt in 1 2 3 4 5; do
+              DB_ID="$(get_db_id)"
+              if [ -n "$DB_ID" ]; then
+                break
+              fi
+              echo "Waiting for D1 database dyeink to appear in account list... attempt $attempt"
+              sleep 2
+            done
+          fi
+
+          if [ -z "$DB_ID" ]; then
+            echo "::error::D1 database \"dyeink\" was not found after create/list."
+            exit 1
+          fi
+
           echo "DB_ID=$DB_ID"
           export DB_ID
           node -e 'const fs = require("fs"); const p = "wrangler.toml"; const id = process.env.DB_ID; let s = fs.readFileSync(p, "utf8"); if (/database_id\s*=/.test(s)) { s = s.replace(/database_id\s*=\s*"[^"]*"/, `database_id = "${id}"`); } else { s = s.replace(/database_name\s*=\s*"dyeink"\n/, `database_name = "dyeink"\ndatabase_id = "${id}"\n`); } fs.writeFileSync(p, s);'
 
       - name: Ensure R2 bucket exists
+        if: steps.cloudflare.outputs.deploy == 'true'
         working-directory: backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler r2 bucket create dyeink-images || true
+        run: |
+          set -euo pipefail
+          if npx wrangler r2 bucket info dyeink-images >/dev/null 2>&1; then
+            echo "R2 bucket dyeink-images already exists."
+          else
+            npx wrangler r2 bucket create dyeink-images
+            for attempt in 1 2 3 4 5; do
+              if npx wrangler r2 bucket info dyeink-images >/dev/null 2>&1; then
+                echo "R2 bucket dyeink-images is ready."
+                exit 0
+              fi
+              echo "Waiting for R2 bucket dyeink-images to become available... attempt $attempt"
+              sleep 2
+            done
+            echo "::error::R2 bucket dyeink-images was not available after creation."
+            exit 1
+          fi
 
       - name: Apply D1 migrations
+        if: steps.cloudflare.outputs.deploy == 'true'
         working-directory: backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler d1 migrations apply dyeink --remote
 
-      - name: Seed APP_PASSWORD (if provided)
-        if: ${{ github.event.inputs.app_password != '' }}
-        working-directory: backend
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: echo "${{ github.event.inputs.app_password }}" | npx wrangler secret put APP_PASSWORD
-
       - name: Deploy Worker
+        if: steps.cloudflare.outputs.deploy == 'true'
         working-directory: backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
+
+      - name: Seed APP_PASSWORD (if provided)
+        if: steps.cloudflare.outputs.deploy == 'true'
+        working-directory: backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APP_PASSWORD_INPUT: ${{ inputs.app_password }}
+          APP_PASSWORD_SECRET: ${{ secrets.APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APP_PASSWORD="${APP_PASSWORD_INPUT:-$APP_PASSWORD_SECRET}"
+          if [ -z "$APP_PASSWORD" ]; then
+            echo "APP_PASSWORD was not provided; skipping secret seed."
+            exit 0
+          fi
+          printf '%s' "$APP_PASSWORD" | npx wrangler secret put APP_PASSWORD
+
+      - name: Deployment skipped
+        if: steps.cloudflare.outputs.deploy != 'true'
+        run: |
+          echo "Build completed. Cloudflare deployment was skipped because required repository secrets are missing."
