@@ -4,7 +4,7 @@ const QUALITY = 0.8
 const MAX_FILE_SIZE = 2 * 1024 * 1024
 
 export async function compressImage(file: File): Promise<File> {
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') || file.type === 'image/gif') {
         return file
     }
 

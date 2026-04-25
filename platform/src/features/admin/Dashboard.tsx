@@ -81,7 +81,7 @@ export default function Dashboard() {
                                     {!ready ? null : 'No stats recorded yet'}
                                 </div>
                             ) : (
-                                <NativeAreaChart data={graphData} />
+                                <NativeAnalyticsChart data={graphData} />
                             )}
                         </div>
                     </CardContent>
@@ -89,11 +89,16 @@ export default function Dashboard() {
             </section>
 
             <div className="mb-8">
+                <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                 {dashboardStats.latestPost ? (
-                    <Link to="/blog" className="block no-underline">
+                    <Link
+                        to={`/blog/${dashboardStats.latestPost.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block no-underline"
+                    >
                         <Card className="border-border bg-transparent shadow-none transition-all hover:border-foreground hover:scale-[1.005]">
                             <CardContent className="p-6">
-                                <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                                 <h3 className="mb-4 break-words font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
                                     {dashboardStats.latestPost.title}
                                 </h3>
@@ -111,7 +116,6 @@ export default function Dashboard() {
                 ) : (
                     <Card className="border-border bg-transparent shadow-none">
                         <CardContent className="p-6">
-                            <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                             <div className="text-center text-muted-foreground">
                                 No posts yet.{' '}
                                 <Link to="/admin/posts/new" className="text-foreground underline">
@@ -140,78 +144,94 @@ type ChartPoint = {
     shares?: number
 }
 
-function NativeAreaChart({ data }: { data: ChartPoint[] }) {
-    const width = 720
-    const height = 300
-    const padding = { top: 20, right: 48, bottom: 44, left: 48 }
+function NativeAnalyticsChart({ data }: { data: ChartPoint[] }) {
+    const width = 780
+    const height = 320
+    const padding = { top: 38, right: 24, bottom: 50, left: 64 }
     const innerWidth = width - padding.left - padding.right
     const innerHeight = height - padding.top - padding.bottom
     const values = data.flatMap((point) => [point.views || 0, point.shares || 0])
-    const maxValue = Math.max(1, ...values)
+    const maxValue = niceMax(Math.max(1, ...values))
+    const baseline = padding.top + innerHeight
+    const slotWidth = data.length > 0 ? innerWidth / data.length : innerWidth
+    const barWidth = Math.max(10, Math.min(34, slotWidth * 0.48))
 
     const xFor = (index: number) =>
-        padding.left + (data.length <= 1 ? innerWidth / 2 : (index / (data.length - 1)) * innerWidth)
-    const yFor = (value: number) => padding.top + innerHeight - (value / maxValue) * innerHeight
-    const linePath = (key: 'views' | 'shares') =>
+        padding.left + (data.length <= 1 ? innerWidth / 2 : index * slotWidth + slotWidth / 2)
+    const yFor = (value: number) => baseline - (value / maxValue) * innerHeight
+    const linePath = (key: 'shares') =>
         data
             .map((point, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index)} ${yFor(point[key] || 0)}`)
             .join(' ')
-    const areaPath = (key: 'views' | 'shares') => {
-        const line = linePath(key)
-        return `${line} L ${xFor(data.length - 1)} ${padding.top + innerHeight} L ${xFor(0)} ${
-            padding.top + innerHeight
-        } Z`
-    }
-    const gridLines = Array.from({ length: 4 }, (_, index) => {
-        const ratio = index / 3
-        return padding.top + ratio * innerHeight
-    })
+    const yTicks = [maxValue, maxValue / 2, 0]
     const labelStep = Math.max(1, Math.ceil(data.length / 5))
 
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-full w-full max-w-[748px] overflow-hidden"
+            className="block h-full w-full max-w-[780px] overflow-visible"
             role="img"
             aria-label="Views and shares over time"
         >
             <defs>
-                <linearGradient id="dash_grad_views" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00cbff" stopOpacity="0.22" />
-                    <stop offset="95%" stopColor="#00cbff" stopOpacity="0" />
-                </linearGradient>
-                <linearGradient id="dash_grad_shares" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity="0.18" />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity="0" />
+                <linearGradient id="dash_bar_views" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00cbff" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#00cbff" stopOpacity="0.28" />
                 </linearGradient>
             </defs>
 
-            {gridLines.map((y, index) => (
-                <line
-                    key={index}
-                    x1={padding.left}
-                    x2={width - padding.right}
-                    y1={y}
-                    y2={y}
-                    stroke="hsl(var(--border))"
-                    strokeDasharray="3 3"
-                />
-            ))}
+            <text x={padding.left} y={18} fill="hsl(var(--muted-foreground))" fontSize="12" fontWeight="600">
+                Views
+            </text>
+            <g transform={`translate(${width - padding.right - 148} 8)`}>
+                <rect width="10" height="10" rx="3" fill="#00cbff" opacity="0.75" />
+                <text x="16" y="10" fill="hsl(var(--muted-foreground))" fontSize="12">Views</text>
+                <line x1="70" x2="84" y1="5" y2="5" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+                <text x="90" y="10" fill="hsl(var(--muted-foreground))" fontSize="12">Shares</text>
+            </g>
 
-            <path d={areaPath('shares')} fill="url(#dash_grad_shares)" />
-            <path d={areaPath('views')} fill="url(#dash_grad_views)" />
-            <path d={linePath('shares')} fill="none" stroke="#8b5cf6" strokeWidth="2" />
-            <path d={linePath('views')} fill="none" stroke="#00cbff" strokeWidth="2" />
+            {yTicks.map((tick) => {
+                const y = yFor(tick)
+                return (
+                    <g key={tick}>
+                        <line
+                            x1={padding.left}
+                            x2={width - padding.right}
+                            y1={y}
+                            y2={y}
+                            stroke="hsl(var(--border))"
+                            strokeDasharray={tick === 0 ? undefined : '4 6'}
+                            strokeOpacity={tick === 0 ? 0.9 : 0.65}
+                        />
+                        <text
+                            x={padding.left - 12}
+                            y={y + 4}
+                            textAnchor="end"
+                            fill="hsl(var(--muted-foreground))"
+                            fontSize="12"
+                        >
+                            {formatAxisValue(tick)}
+                        </text>
+                    </g>
+                )
+            })}
 
             {data.map((point, index) => (
                 <g key={`${point.date}-${index}`}>
-                    <circle cx={xFor(index)} cy={yFor(point.views || 0)} r="3" fill="#00cbff">
+                    <rect
+                        x={xFor(index) - barWidth / 2}
+                        y={yFor(point.views || 0)}
+                        width={barWidth}
+                        height={Math.max(1, baseline - yFor(point.views || 0))}
+                        rx="6"
+                        fill="url(#dash_bar_views)"
+                    >
                         <title>{`${point.name || point.date}: ${point.views || 0} views, ${point.shares || 0} shares`}</title>
-                    </circle>
+                    </rect>
                     {index % labelStep === 0 || index === data.length - 1 ? (
                         <text
                             x={xFor(index)}
-                            y={height - 10}
+                            y={height - 16}
                             textAnchor="middle"
                             fill="hsl(var(--muted-foreground))"
                             fontSize="12"
@@ -222,12 +242,34 @@ function NativeAreaChart({ data }: { data: ChartPoint[] }) {
                 </g>
             ))}
 
-            <text x={padding.left} y={padding.top + 10} fill="hsl(var(--muted-foreground))" fontSize="12">
-                {maxValue.toLocaleString()}
-            </text>
-            <text x={padding.left} y={padding.top + innerHeight} fill="hsl(var(--muted-foreground))" fontSize="12">
-                0
-            </text>
+            <line x1={padding.left} x2={padding.left} y1={padding.top} y2={baseline} stroke="hsl(var(--border))" />
+            <line x1={padding.left} x2={width - padding.right} y1={baseline} y2={baseline} stroke="hsl(var(--border))" />
+            {data.length > 0 && (
+                <path d={linePath('shares')} fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            )}
+            {data.map((point, index) => (
+                <circle
+                    key={`${point.date}-${index}-share`}
+                    cx={xFor(index)}
+                    cy={yFor(point.shares || 0)}
+                    r="3.5"
+                    fill="#f59e0b"
+                    stroke="hsl(var(--background))"
+                    strokeWidth="2"
+                />
+            ))}
         </svg>
     )
+}
+
+function niceMax(value: number) {
+    if (value <= 1) return 1
+    const power = 10 ** Math.floor(Math.log10(value))
+    const normalized = value / power
+    const rounded = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
+    return rounded * power
+}
+
+function formatAxisValue(value: number) {
+    return Math.round(value).toLocaleString()
 }

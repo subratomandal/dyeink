@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Dribbble, Github, Globe, Linkedin, Share2 } from 'lucide-react'
-import DOMPurify from 'dompurify'
 import ThemeToggle from '@/components/common/ui/ThemeToggle'
 import SubscribeModal from '@/components/common/ui/SubscribeModal'
 import { useToast } from '@/components/common/feedback/Toast'
@@ -11,6 +10,7 @@ import { settingsService, type SiteSettings } from '@/services/settingsService'
 import { statsService } from '@/services/statsService'
 import type { Post, PublicPost } from '@/types'
 import { formatDateShort } from '@/lib/date'
+import { renderGitHubContent, renderMermaidDiagrams } from '@/lib/githubMarkdown'
 
 const XIcon = ({ size = 20 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -189,7 +189,7 @@ export default function Blog() {
                     searchTerm={searchTerm}
                     onSearchChange={(value) => {
                         setSearchTerm(value)
-                        setSearchParams({ page: '1' })
+                        if (!slug) setSearchParams({ page: '1' })
                     }}
                     onSubscribe={() => setIsSubscribeOpen(true)}
                 />
@@ -213,6 +213,7 @@ export default function Blog() {
                                     post={post}
                                     isDetail={!!slug}
                                     isLast={index === (slug ? detailPosts : pagePosts).length - 1}
+                                    searchTerm={searchTerm}
                                     onShare={() => handleShare(post)}
                                 />
                             ))}
@@ -346,26 +347,24 @@ function BlogSidebar({
                     </button>
                 )}
 
-                {!slug && (
-                    <div className="sidebar-search-wrapper" style={{ margin: '0.35rem 0' }}>
-                        <input
-                            className="blog-search-input"
-                            type="text"
-                            placeholder="Search here..."
-                            value={searchTerm}
-                            onChange={(event) => onSearchChange(event.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '0.5rem',
-                                fontSize: '0.9rem',
-                                border: '1px solid var(--border-color)',
-                                background: 'transparent',
-                                borderRadius: '4px',
-                                color: 'var(--text-primary)',
-                            }}
-                        />
-                    </div>
-                )}
+                <div className="sidebar-search-wrapper" style={{ margin: '0.35rem 0' }}>
+                    <input
+                        className="blog-search-input"
+                        type="text"
+                        placeholder="Search here..."
+                        value={searchTerm}
+                        onChange={(event) => onSearchChange(event.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            fontSize: '0.9rem',
+                            border: '1px solid var(--border-color)',
+                            background: 'transparent',
+                            borderRadius: '4px',
+                            color: 'var(--text-primary)',
+                        }}
+                    />
+                </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.1rem' }}>
                     {visibleSocials.map((social) => (
@@ -401,19 +400,31 @@ function BlogArticle({
     post,
     isDetail,
     isLast,
+    searchTerm,
     onShare,
 }: {
     post: PublicPost | Post
     isDetail: boolean
     isLast: boolean
+    searchTerm: string
     onShare: () => void
 }) {
     const content = isDetail && 'content' in post ? post.content : ''
     const publicPreview = 'preview' in post ? post.preview : undefined
     const preview = !isDetail ? publicPreview || htmlToPlainText(post.excerpt) : ''
+    const articleRef = useRef<HTMLElement>(null)
+    const articleHtml = useMemo(() => {
+        return content ? renderGitHubContent(content, searchTerm) : ''
+    }, [content, searchTerm])
+
+    useEffect(() => {
+        if (!articleRef.current || !isDetail) return
+        renderMermaidDiagrams(articleRef.current)
+    }, [articleHtml, isDetail])
 
     return (
         <article
+            ref={articleRef}
             style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -465,10 +476,7 @@ function BlogArticle({
                                 fontWeight: 400,
                             }}
                             dangerouslySetInnerHTML={{
-                                __html: DOMPurify.sanitize(content, {
-                                    ADD_TAGS: ['img'],
-                                    ADD_ATTR: ['src', 'alt', 'width', 'height', 'style', 'target', 'rel'],
-                                }),
+                                __html: articleHtml,
                             }}
                         />
                     ) : null}
@@ -587,12 +595,159 @@ function BlogStyle() {
                 margin: 1.5rem 0;
                 display: block;
             }
+            .post-content pre {
+                max-width: 100%;
+                overflow-x: auto;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 1rem;
+                background: var(--bg-secondary);
+            }
+            .post-content code {
+                font-family: var(--font-mono);
+                font-size: 0.9em;
+            }
+            .github-youtube-embed {
+                position: relative;
+                width: 100%;
+                max-width: 700px;
+                aspect-ratio: 16 / 9;
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                background: #000;
+            }
+            .github-youtube-embed iframe {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+            }
+            .github-markdown-table {
+                width: 100%;
+                max-width: 700px;
+                border-collapse: collapse;
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                display: block;
+            }
+            .github-markdown-table th,
+            .github-markdown-table td {
+                border: 1px solid var(--border-color);
+                padding: 0.65rem 0.8rem;
+                text-align: left;
+                vertical-align: top;
+            }
+            .github-markdown-table th {
+                color: var(--text-primary);
+                background: var(--bg-secondary);
+            }
+            .github-task-list {
+                list-style: none;
+                padding-left: 0 !important;
+            }
+            .github-task-list-item {
+                display: flex;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .github-task-list-item input {
+                margin-top: 0.3em;
+            }
+            .github-alert {
+                max-width: 700px;
+                border-left: 4px solid #0969da;
+                border-radius: 8px;
+                padding: 0.85rem 1rem;
+                background: rgba(9, 105, 218, 0.08);
+            }
+            .github-alert-title {
+                margin-bottom: 0.35rem;
+                font-family: var(--font-mono);
+                font-size: 0.78rem;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                color: #0969da;
+            }
+            .github-alert-tip { border-left-color: #1a7f37; background: rgba(26, 127, 55, 0.08); }
+            .github-alert-tip .github-alert-title { color: #1a7f37; }
+            .github-alert-important { border-left-color: #8250df; background: rgba(130, 80, 223, 0.08); }
+            .github-alert-important .github-alert-title { color: #8250df; }
+            .github-alert-warning { border-left-color: #9a6700; background: rgba(154, 103, 0, 0.1); }
+            .github-alert-warning .github-alert-title { color: #9a6700; }
+            .github-alert-caution { border-left-color: #cf222e; background: rgba(207, 34, 46, 0.08); }
+            .github-alert-caution .github-alert-title { color: #cf222e; }
+            .github-mermaid,
+            .github-diagram {
+                max-width: 700px;
+                overflow-x: auto;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                padding: 1rem;
+                background: var(--bg-secondary);
+            }
+            .github-mermaid svg {
+                display: block;
+                max-width: 100%;
+                height: auto;
+                margin: 0 auto;
+            }
+            .github-mermaid-fallback::before {
+                content: 'Mermaid source';
+                display: block;
+                margin-bottom: 0.5rem;
+                font-family: var(--font-mono);
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+            }
+            .github-diagram figcaption {
+                margin-bottom: 0.75rem;
+                font-family: var(--font-mono);
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+            }
+            .github-footnotes {
+                max-width: 700px;
+                margin-top: 2rem;
+                padding-top: 1rem;
+                border-top: 1px solid var(--border-color);
+                font-size: 0.85rem;
+                color: var(--text-muted);
+            }
+            .github-math-inline {
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+            }
+            .github-math-block {
+                max-width: 700px;
+                overflow-x: auto;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                padding: 1rem;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                font-family: var(--font-mono);
+            }
+            .github-math-fallback {
+                white-space: pre-wrap;
+            }
             .blog-post-preview {
                 display: -webkit-box;
                 -webkit-line-clamp: 3;
                 -webkit-box-orient: vertical;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+            .blog-search-highlight {
+                background: rgba(0, 132, 255, 0.18);
+                border-radius: 0.16em;
+                color: #0084ff !important;
+                padding: 0 0.08em;
             }
             @media (max-width: 499px) {
                 div[style*="grid-template-columns"] {
