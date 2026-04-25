@@ -1,0 +1,25 @@
+#:schema node_modules/wrangler/config-schema.json
+#
+# Optional Cloudflare Pages config for DyeInk.
+#
+# The root wrangler.toml is Workers-specific for the Deploy to Cloudflare
+# button. If you deploy this repo as a Git-connected Pages project instead,
+# use this file as the binding reference in the Pages dashboard, or copy it to
+# wrangler.toml in a Pages-only fork.
+
+name = "dyeink"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "platform/dist"
+
+# -------- D1: relational storage --------
+[[d1_databases]]
+binding = "DB"
+database_name = "dyeink"
+database_id = "__REPLACE_WITH_YOUR_D1_ID__"
+migrations_dir = "backend/migrations"
+
+# -------- R2: image uploads --------
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "dyeink-images"

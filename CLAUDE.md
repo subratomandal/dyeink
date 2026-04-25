@@ -83,8 +83,10 @@ When adding fields, write a new `0002_xxx.sql` rather than editing `0001_init.sq
 
 The README has the user-facing deploy walkthrough. From a maintainer's perspective:
 
-- `wrangler.toml` declares D1 + R2 bindings and a `[build]` step that runs `cd ../platform && npm install --legacy-peer-deps && npm run build`. So `wrangler deploy` is fully self-contained — it builds the SPA before uploading the Worker
-- `[assets].directory = "../platform/dist"` is what binds the built SPA into the Worker's `c.env.ASSETS` fetcher
+- The root `wrangler.toml` is Workers-specific because Cloudflare's Deploy to Cloudflare flow runs `npx wrangler deploy` from the repo root after `npm run build`
+- `[assets].directory = "platform/dist"` is what binds the built SPA into the Worker's `c.env.ASSETS` fetcher
+- `backend/wrangler.toml` is still useful for manual backend-local deploys via `cd backend && npm run deploy`
+- `wrangler.pages.toml` is a reference config for Git-connected Pages deployments; Pages projects must not run `npx wrangler deploy`
 - `database_id` in `wrangler.toml` is `__REPLACE_ON_FIRST_DEPLOY__` initially. On first `wrangler deploy`, wrangler asks if it should patch the file with the real ID. The Cloudflare Deploy button does the same thing automatically
 - `.github/workflows/deploy.yml` provisions D1/R2 via `wrangler d1 create` / `wrangler r2 bucket create` (idempotent), patches the database_id at runtime, applies migrations, and deploys. Auto-runs on push to `main`
 

@@ -22,7 +22,7 @@ What "single deploy" means here:
 Supported deploy targets:
 
 1. Cloudflare Workers (deploy button — auto-provisions D1 + R2)
-2. Cloudflare Pages (Git-connected, with wrangler.toml at repo root)
+2. Cloudflare Pages (Git-connected, with `wrangler.pages.toml` as the binding reference)
 3. Local development against a local D1 with `wrangler dev`
 
 ### Architecture
@@ -108,7 +108,7 @@ flowchart TB
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fsubratomandalme%2Fdyeink)
 
 1. Click the button. Cloudflare clones the repo into your account
-2. Cloudflare reads `backend/wrangler.toml`, runs the `[build]` step which builds the SPA, then uploads the Worker
+2. Cloudflare runs `npm run build`, then reads the root `wrangler.toml` and uploads the Worker
 3. D1 (`dyeink`) and R2 (`dyeink-images`) are auto-provisioned the first time
 4. Open the generated `https://dyeink.<account>.workers.dev` URL
 5. The setup form prompts you for an admin password (12+ chars, mixed case, number, symbol)
@@ -118,13 +118,15 @@ flowchart TB
 
 If you connected the repo to Pages instead of clicking the Workers button, Pages will run `npm run build` from the root, which builds the SPA *and* bundles the Hono Worker into `platform/dist/_worker.js`. Pages uses the `_worker.js` as a catch-all for the site, so the API works on the same origin as the SPA.
 
+Do not set a Pages deploy command to `npx wrangler deploy`; that command is for Workers projects. Leave the deploy command empty so Pages deploys `platform/dist`, or use `npx wrangler pages deploy platform/dist` for direct-upload Pages deployments.
+
 D1 and R2 resources are **not** auto-created on Pages. One-time setup:
 
 1. Cloudflare dashboard → D1 → Create database → name `dyeink`
-2. Copy the database_id and paste it into the root `wrangler.toml` under `[[d1_databases]]`
+2. Use `wrangler.pages.toml` as the binding reference, or copy it to `wrangler.toml` in a Pages-only fork and paste the database_id under `[[d1_databases]]`
 3. Cloudflare dashboard → R2 → Create bucket → name `dyeink-images`
 4. Apply migrations: `npx wrangler d1 migrations apply dyeink --remote`
-5. Push the updated `wrangler.toml` — Pages picks up the bindings automatically on next deploy
+5. Add the D1 and R2 bindings in Pages settings, or push the Pages-only `wrangler.toml` copy
 
 Or skip steps 1-2 by running locally:
 
@@ -133,7 +135,7 @@ npx wrangler login
 npx wrangler d1 create dyeink                  # prints the database_id
 npx wrangler r2 bucket create dyeink-images
 npx wrangler d1 migrations apply dyeink --remote
-# Paste the database_id into wrangler.toml, commit, push
+# Paste the database_id into Pages bindings or wrangler.pages.toml
 ```
 
 #### Manual via CLI (without the deploy button)
