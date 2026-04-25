@@ -73,7 +73,7 @@ export default function Dashboard() {
                     <Stat label="Published" value={dashboardStats.publishedPosts.toString()} />
                 </div>
 
-                <Card className="overflow-hidden shadow-none">
+                <Card className="overflow-hidden border-border bg-transparent shadow-none">
                     <CardContent className="p-4 sm:p-6">
                         <div className="h-[300px] w-full min-w-0 overflow-hidden">
                             {!ready || graphData.length === 0 ? (
@@ -91,7 +91,7 @@ export default function Dashboard() {
             <div className="mb-8">
                 {dashboardStats.latestPost ? (
                     <Link to="/blog" className="block no-underline">
-                        <Card className="transition-all hover:border-foreground hover:scale-[1.005]">
+                        <Card className="border-border bg-transparent shadow-none transition-all hover:border-foreground hover:scale-[1.005]">
                             <CardContent className="p-6">
                                 <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                                 <h3 className="mb-4 break-words font-heading text-2xl font-normal leading-tight tracking-tight text-foreground">
@@ -109,7 +109,7 @@ export default function Dashboard() {
                         </Card>
                     </Link>
                 ) : (
-                    <Card>
+                    <Card className="border-border bg-transparent shadow-none">
                         <CardContent className="p-6">
                             <h2 className="mb-5 text-xl font-semibold text-muted-foreground">Latest Post</h2>
                             <div className="text-center text-muted-foreground">
@@ -171,7 +171,7 @@ function NativeAreaChart({ data }: { data: ChartPoint[] }) {
     return (
         <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="block h-full w-full overflow-hidden"
+            className="block h-full w-full max-w-[720px] overflow-hidden"
             role="img"
             aria-label="Views and shares over time"
         >

@@ -8,8 +8,8 @@ export default function PostsSkeleton() {
                 <Skeleton className="h-5 w-48 rounded-full" />
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_92px] border-b border-border bg-muted/20 px-5 py-3 md:grid">
+            <div className="overflow-hidden rounded-2xl border border-border bg-transparent">
+                <div className="hidden grid-cols-[minmax(0,1fr)_130px_150px_92px] border-b border-border bg-transparent px-5 py-3 md:grid">
                     <Skeleton className="h-3 w-14 rounded-full" />
                     <Skeleton className="h-3 w-16 rounded-full" />
                     <Skeleton className="h-3 w-12 rounded-full" />

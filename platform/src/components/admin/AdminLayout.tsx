@@ -79,14 +79,14 @@ export default function AdminLayout() {
     const navigate = useNavigate()
     const location = useLocation()
     const { settings, fetchSettings } = useAdminStore()
-    const greetingName = settings?.authorName || settings?.siteName || name || 'Admin'
+    const greetingName = settings?.siteName || name || 'Admin'
     const [isLoggingOut, setIsLoggingOut] = useState(false)
 
     useEffect(() => {
         if (!isAuthenticated) return
         useAdminStore.getState().fetchPosts()
         useAdminStore.getState().fetchStats()
-        fetchSettings()
+        fetchSettings(true)
     }, [isAuthenticated, fetchSettings])
 
     const isActive = (path: string) => location.pathname === path
