@@ -76,7 +76,7 @@ export default function Dashboard() {
                     <Stat label="Published" value={dashboardStats.publishedPosts.toString()} />
                 </div>
 
-                <Card className="overflow-hidden border-border bg-transparent shadow-none">
+                <Card className="overflow-hidden border-0 bg-transparent shadow-none">
                     <CardContent className="px-0 py-3 sm:py-6">
                         <div className="dashboard-chart-frame h-[280px] w-full min-w-0 overflow-hidden sm:h-[390px]">
                             {!ready || graphData.length === 0 ? (
@@ -172,7 +172,7 @@ type ChartPoint = {
 function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
     const width = 1080
     const height = 390
-    const padding = { top: 28, right: 118, bottom: 62, left: 74 }
+    const padding = { top: 28, right: 132, bottom: 62, left: 56 }
     const innerWidth = width - padding.left - padding.right
     const innerHeight = height - padding.top - padding.bottom
     const points = data.map((point, index) => ({
@@ -226,20 +226,20 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
         >
             <defs>
                 <linearGradient id="dash_views_area" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--foreground))" stopOpacity="0.2" />
-                    <stop offset="55%" stopColor="hsl(var(--foreground))" stopOpacity="0.075" />
-                    <stop offset="100%" stopColor="hsl(var(--foreground))" stopOpacity="0" />
+                    <stop offset="0%" stopColor="#ec4899" stopOpacity="0.24" />
+                    <stop offset="55%" stopColor="#a855f7" stopOpacity="0.095" />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
                 </linearGradient>
                 <linearGradient id="dash_views_line" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="hsl(var(--muted-foreground))" />
-                    <stop offset="100%" stopColor="hsl(var(--foreground))" />
+                    <stop offset="0%" stopColor="#ec4899" />
+                    <stop offset="100%" stopColor="#a855f7" />
                 </linearGradient>
             </defs>
 
             <g transform={`translate(${width - padding.right - 208} 12)`}>
-                <circle cx="7" cy="7" r="6" fill="hsl(var(--foreground))" />
+                <circle cx="7" cy="7" r="6" fill="#ec4899" />
                 <text x="22" y="12" fill="hsl(var(--muted-foreground))" fontSize="16" fontWeight="700">Views</text>
-                <line x1="96" x2="122" y1="7" y2="7" stroke="#d6a04f" strokeWidth="5" strokeLinecap="round" />
+                <line x1="96" x2="122" y1="7" y2="7" stroke="#8b5cf6" strokeWidth="5" strokeLinecap="round" />
                 <text x="136" y="12" fill="hsl(var(--muted-foreground))" fontSize="16" fontWeight="700">Shares</text>
             </g>
 
@@ -283,7 +283,7 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                 <path
                     d={sharesPath}
                     fill="none"
-                    stroke="#d6a04f"
+                    stroke="#8b5cf6"
                     strokeWidth="5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -294,14 +294,14 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                 const showLabel = index === 0 || index === points.length - 1 || index % labelStep === 0
                 return (
                     <g key={`${point.date}-${index}`}>
-                        <circle cx={xScale(point.index)} cy={yScale(point.views)} r="7" fill="hsl(var(--foreground))">
+                        <circle cx={xScale(point.index)} cy={yScale(point.views)} r="7" fill="#ec4899">
                             <title>{`${point.label}: ${point.views} views, ${point.shares} shares`}</title>
                         </circle>
                         <circle
                             cx={xScale(point.index)}
                             cy={yScale(point.shares)}
                             r="5.8"
-                            fill="#d6a04f"
+                            fill="#8b5cf6"
                             stroke="hsl(var(--background))"
                             strokeWidth="2.4"
                         />
@@ -338,7 +338,7 @@ function CombinedAnalyticsChart({ data }: { data: ChartPoint[] }) {
                         </text>
                     </g>
                     <g transform={`translate(${width - padding.right + 12} ${sharesLabelY})`}>
-                        <text fill="#d6a04f" fontSize="16" fontWeight="800">
+                        <text fill="#8b5cf6" fontSize="16" fontWeight="800">
                             {formatAxisValue(lastPoint.shares)}
                         </text>
                         <text

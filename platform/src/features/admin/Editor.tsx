@@ -392,9 +392,9 @@ export default function Editor() {
                         size="icon"
                         onClick={() => navigate(-1)}
                         aria-label="Back"
-                        className="h-10 w-10 rounded-full p-0"
+                        className="flex h-10 w-10 items-center justify-center rounded-full p-0 leading-none [&_svg]:!size-6"
                     >
-                        <ChevronLeft className="h-5 w-5 translate-x-px" />
+                        <ChevronLeft className="!h-6 !w-6" />
                     </Button>
                     {lastSaved && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

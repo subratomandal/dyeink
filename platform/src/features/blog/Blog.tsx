@@ -208,7 +208,7 @@ export default function Blog() {
                     onSubscribe={() => setIsSubscribeOpen(true)}
                 />
 
-                <main ref={contentRef} style={{ paddingTop: '0.4rem' }}>
+                <main ref={contentRef} className="blog-main" style={{ paddingTop: '0.4rem' }}>
                     {loading || activePostLoading ? (
                         <div style={{ padding: '2rem 0', color: 'var(--text-muted)' }}>Loading...</div>
                     ) : isEmpty ? (
@@ -220,7 +220,7 @@ export default function Blog() {
                             Post not found.
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: slug ? 0 : '2.5rem' }}>
+                        <div className="blog-post-stack" style={{ display: 'flex', flexDirection: 'column', gap: slug ? 0 : '2.5rem' }}>
                             {(slug ? detailPosts : pagePosts).map((post, index) => (
                                 <BlogArticle
                                     key={post.id}
@@ -234,6 +234,7 @@ export default function Blog() {
 
                             {!slug && totalPages > 1 && (
                                 <div
+                                    className="blog-pagination"
                                     style={{
                                         display: 'flex',
                                         justifyContent: 'center',
@@ -524,6 +525,7 @@ function BlogArticle({
             )}
 
             <div
+                className="blog-article-meta"
                 style={{
                     marginTop: '0.5rem',
                     display: 'flex',
@@ -794,25 +796,42 @@ function BlogStyle() {
             @media (max-width: 768px) {
                 .blog-layout-grid {
                     grid-template-columns: 1fr !important;
-                    gap: 0.85rem !important;
+                    justify-items: stretch !important;
+                    gap: 0.65rem !important;
                     padding: 4rem 1rem 1.75rem !important;
+                    text-align: left !important;
+                }
+                .blog-layout-grid aside,
+                .blog-main {
+                    width: 100% !important;
+                    text-align: left !important;
                 }
                 aside {
                     position: relative !important;
                     top: 0 !important;
-                    padding-bottom: 0.35rem !important;
-                    margin-bottom: 0.15rem;
+                    padding-bottom: 0.25rem !important;
+                    margin-bottom: 0 !important;
                 }
                 aside > div:first-child {
-                    margin-bottom: 0.4rem !important;
+                    margin-bottom: 0.32rem !important;
+                    text-align: left !important;
+                }
+                aside > div:first-child > div {
+                    align-items: flex-start !important;
+                    justify-content: flex-start !important;
+                    text-align: left !important;
                 }
                 aside > div:first-child h1 {
                     font-size: clamp(1.4rem, 7.5vw, 1.95rem) !important;
                     font-weight: 500 !important;
                     line-height: 1.08 !important;
+                    margin: 0 !important;
+                    text-align: left !important;
                 }
                 aside > div:last-child {
-                    gap: 0.2rem !important;
+                    align-items: flex-start !important;
+                    gap: 0.18rem !important;
+                    text-align: left !important;
                 }
                 .blog-search-input {
                     margin: 0 !important;
@@ -820,20 +839,23 @@ function BlogStyle() {
                     min-height: 38px !important;
                     font-size: 0.95rem !important;
                     padding: 0.42rem 0.5rem !important;
+                    text-align: left !important;
                 }
                 aside > div:last-child > .sidebar-search-wrapper {
                     margin: 0 !important;
-                    margin-top: 0.25rem !important;
+                    margin-top: 0.22rem !important;
+                    width: 100% !important;
                 }
                 .blog-social-links {
                     flex-direction: row !important;
                     flex-wrap: wrap !important;
-                    gap: 0.25rem !important;
+                    gap: 0.2rem !important;
                     margin: 0 !important;
-                    margin-top: 0.1rem !important;
+                    margin-top: 0.06rem !important;
                     padding: 0 !important;
                     display: flex !important;
                     align-items: center !important;
+                    justify-content: flex-start !important;
                     height: auto !important;
                 }
                 aside > div:last-child > div {
@@ -846,32 +868,49 @@ function BlogStyle() {
                     min-width: 0 !important;
                     display: inline-flex !important;
                     align-items: center !important;
+                    justify-content: flex-start !important;
                     font-size: 0.9rem !important;
                     line-height: 1.2 !important;
+                    padding: 0 !important;
+                    text-align: left !important;
                 }
                 .blog-social-links a {
                     min-width: 32px !important;
-                    justify-content: center;
+                    justify-content: flex-start !important;
                 }
-                main {
+                .blog-main {
                     padding-top: 0 !important;
                     min-width: 0 !important;
                 }
-                main > div {
-                    gap: 0.9rem !important;
+                .blog-post-stack {
+                    align-items: stretch !important;
+                    gap: 0.72rem !important;
+                    text-align: left !important;
                 }
                 article {
-                    gap: 0.55rem !important;
-                    padding-bottom: 0.85rem !important;
+                    align-items: stretch !important;
+                    gap: 0.48rem !important;
+                    padding-bottom: 0.76rem !important;
+                    text-align: left !important;
+                }
+                article header {
+                    text-align: left !important;
                 }
                 article h2 {
                     font-size: clamp(1.12rem, 5.4vw, 1.52rem) !important;
                     line-height: 1.14 !important;
-                    margin-bottom: 0.25rem !important;
+                    margin-bottom: 0.22rem !important;
+                    text-align: left !important;
+                    text-wrap: wrap !important;
+                }
+                article h2 a {
+                    text-align: left !important;
                 }
                 .blog-post-preview {
                     font-size: 0.9rem !important;
                     line-height: 1.48 !important;
+                    max-width: 100% !important;
+                    text-align: left !important;
                 }
                 .blog-theme-toggle-wrapper {
                     top: 0.85rem !important;
@@ -895,6 +934,47 @@ function BlogStyle() {
                     font-size: 0.92rem !important;
                     line-height: 1.62 !important;
                     overflow-wrap: anywhere !important;
+                    text-align: left !important;
+                }
+                .post-content h1,
+                .post-content h2,
+                .post-content h3,
+                .post-content h4,
+                .post-content h5,
+                .post-content h6 {
+                    margin-top: 0.95rem !important;
+                    margin-bottom: 0.42rem !important;
+                    text-align: left !important;
+                }
+                .post-content p,
+                .post-content li,
+                .post-content blockquote,
+                .post-content div,
+                .post-content span,
+                .post-content th,
+                .post-content td,
+                .post-content figcaption,
+                .post-content [align="center"],
+                .post-content [align="right"],
+                .post-content [align="justify"],
+                .post-content [style*="text-align: center"],
+                .post-content [style*="text-align: right"],
+                .post-content [style*="text-align: justify"] {
+                    text-align: left !important;
+                    text-align-last: auto !important;
+                }
+                .post-content ul,
+                .post-content ol {
+                    margin: 0.68rem 0 !important;
+                    padding-left: 1.18rem !important;
+                    text-align: left !important;
+                }
+                .post-content blockquote {
+                    margin-left: 0 !important;
+                    margin-right: 0 !important;
+                }
+                .github-mermaid svg {
+                    margin: 0 !important;
                 }
                 .github-markdown-table,
                 .github-math-block,
@@ -902,6 +982,19 @@ function BlogStyle() {
                 .github-diagram,
                 .github-youtube-embed {
                     max-width: 100% !important;
+                }
+                .blog-article-meta {
+                    justify-content: flex-start !important;
+                    align-items: flex-start !important;
+                    flex-wrap: wrap !important;
+                    gap: 0.7rem !important;
+                    margin-top: 0.15rem !important;
+                    text-align: left !important;
+                }
+                .blog-pagination {
+                    justify-content: flex-start !important;
+                    margin-top: 0.7rem !important;
+                    gap: 0.4rem !important;
                 }
             }
         `}</style>
