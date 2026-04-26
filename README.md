@@ -172,7 +172,7 @@ Optional workflow input:
 
 - `app_password` seeds the first admin password through `APP_PASSWORD`.
 
-The workflow patches a temporary Wrangler config with the provisioned D1 database ID, applies migrations, and deploys the Worker.
+The workflow patches `backend/wrangler.toml` in the runner with the provisioned D1 database ID, applies migrations, and deploys the Worker. The patch is not committed back to your repository.
 
 ## Local Development
 
@@ -227,6 +227,14 @@ Optional runtime variables:
 - `APP_PASSWORD` seeds the first admin password when no admin exists.
 - `R2_PUBLIC_URL` serves image URLs directly from a public R2/custom domain instead of proxying through `/img`.
 - `FRONTEND_ORIGIN` controls the allowed CORS origin for API requests.
+- `D1_HIT_ROLLUPS` controls D1 view/share counters. The default is `on`.
+- `SITE_URL` sets the base URL used in newsletter links when no verified custom domain is connected.
+- `EMAIL_FROM` and `EMAIL_FROM_NAME` enable newsletter sending when an `EMAIL` send-email binding is configured.
+- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` enable the in-app custom-domain connection button.
+- `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_ZONE_NAME` are optional fallbacks when the token cannot list zones.
+- `CLOUDFLARE_WORKER_NAME` is optional when the deployed Worker is not named `dyeink`.
+- `CLOUDFLARE_WORKER_ENVIRONMENT` is optional for environment-scoped Worker domain APIs.
+- `CUSTOM_DOMAIN_TARGET` is optional when the domain verification target must differ from `SITE_URL` or the current Worker origin.
 
 Optional frontend development variable:
 
@@ -250,13 +258,13 @@ Uploaded images are stored in the `dyeink-images` bucket. If `R2_PUBLIC_URL` is 
 
 ## Stack
 
-- Frontend: React 18, Vite 8, TypeScript, Tailwind CSS, shadcn/Radix UI, React Router, Zustand.
+- Frontend: React 18, Vite 8, TypeScript, Tailwind CSS, shadcn/Radix UI, React Router, and a small native `useSyncExternalStore` state layer.
 - Backend: Hono on Cloudflare Workers.
 - Database: Cloudflare D1.
 - Storage: Cloudflare R2.
 - Authentication: PBKDF2-SHA256 password hashing, HMAC-signed HttpOnly cookies, login rate limiting.
 - Editor: Native `contentEditable` rich-text editor with sanitized HTML output.
-- UI extras: Recharts, Framer Motion, GSAP, Three/OGL.
+- UI extras: D3-powered dashboard SVG chart, custom CSS/canvas effects, GitHub-style Markdown rendering, Mermaid, MathJax, and YouTube embeds.
 
 ## Security
 
@@ -272,6 +280,7 @@ Uploaded images are stored in the `dyeink-images` bucket. If `R2_PUBLIC_URL` is 
 
 ```bash
 npm run build
+npm run typecheck
 npm run dev:worker
 npm run dev:all
 npm run deploy

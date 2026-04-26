@@ -11,6 +11,9 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*"],
