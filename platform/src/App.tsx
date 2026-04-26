@@ -61,7 +61,7 @@ function isBlogPath(pathname: string) {
 }
 
 function AppRoutes() {
-    const currentPath = window.location.pathname
+    const currentPath = typeof window === 'undefined' ? '/' : window.location.pathname
     const isCustomHost = typeof window !== 'undefined' && !isDefaultAppHost(window.location.hostname)
 
     if (isCustomHost && !isBlogPath(currentPath)) {

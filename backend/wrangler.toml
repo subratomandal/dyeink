@@ -33,6 +33,7 @@ command = "cd ../platform && npm install --legacy-peer-deps --no-audit --no-fund
 directory = "../platform/dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = true
 
 # -------- D1: relational storage --------
 # No database_id is committed. Wrangler auto-provisions D1 on first deploy.

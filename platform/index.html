@@ -12,6 +12,53 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Roboto:wght@300;400;500;700;900&display=swap"
     rel="stylesheet">
+  <script>
+    (function () {
+      var hostname = window.location.hostname.toLowerCase().replace(/\.$/, '');
+      var isDefaultHost =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0' ||
+        hostname.endsWith('.workers.dev') ||
+        hostname.endsWith('.pages.dev');
+      var isBlogPath = window.location.pathname === '/blog' || window.location.pathname.indexOf('/blog/') === 0;
+
+      if (!isDefaultHost && !isBlogPath) {
+        window.location.replace('/blog');
+        return;
+      }
+
+      window.addEventListener(
+        'error',
+        function (event) {
+          var target = event.target;
+          var tagName = target && target.tagName;
+          var isBuildAsset =
+            (tagName === 'SCRIPT' && target.src && target.src.indexOf('/assets/') !== -1) ||
+            (tagName === 'LINK' && target.href && target.href.indexOf('/assets/') !== -1);
+          if (!isBuildAsset) return;
+
+          try {
+            var key = 'dyeink_asset_reload_once';
+            if (window.sessionStorage.getItem(key)) return;
+            window.sessionStorage.setItem(key, '1');
+          } catch {
+            /* sessionStorage can be unavailable in hardened browsers */
+          }
+          window.location.reload();
+        },
+        true
+      );
+
+      window.addEventListener('load', function () {
+        try {
+          window.sessionStorage.removeItem('dyeink_asset_reload_once');
+        } catch {
+          /* sessionStorage can be unavailable in hardened browsers */
+        }
+      });
+    })();
+  </script>
 </head>
 
 <body>

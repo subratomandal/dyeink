@@ -66,6 +66,7 @@ app.use('/api/*', (c, next) => {
   })(c, next)
 })
 
+app.use('/', enforceCustomDomainBlogBoundary)
 app.use('*', enforceCustomDomainBlogBoundary)
 
 // ---------- Auth middleware ----------
@@ -1181,7 +1182,14 @@ async function getSettingsPayload(db: D1Database) {
 }
 
 function requestHostname(c: AppCtx) {
-  return new URL(c.req.url).hostname.toLowerCase().replace(/\.$/, '')
+  const forwardedHost = c.req.header('x-forwarded-host') || c.req.header('host')
+  const rawHost = forwardedHost || new URL(c.req.url).host
+  return rawHost
+    .split(',')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/:\d+$/, '')
+    .replace(/\.$/, '')
 }
 
 function normalizeStoredHostname(hostname: string | null | undefined) {
@@ -1247,6 +1255,8 @@ async function enforceCustomDomainBlogBoundary(c: AppCtx, next: Next) {
   }
 
   url.pathname = '/blog'
+  url.hostname = host
+  url.port = ''
   url.search = ''
   return new Response(null, {
     status: 302,
