@@ -56,7 +56,10 @@ function getCachedPublicSettings(): Promise<SiteSettings | null> {
 }
 
 async function getApiSettings(): Promise<SiteSettings | null> {
-    const response = await apiClient.get('/settings')
+    const response = await apiClient.get('/settings', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-store' },
+    })
     return response.data ?? DEFAULT_SETTINGS
 }
 
@@ -152,7 +155,13 @@ export const settingsService = {
     },
 
     async disconnectDomain(): Promise<{ ok: boolean; settings?: SiteSettings; warning?: string }> {
-        const response = await apiClient.delete<{ ok: boolean; settings?: SiteSettings; warning?: string }>('/add-domain')
+        const response = await apiClient.delete<{ ok: boolean; settings?: SiteSettings; warning?: string }>(
+            '/add-domain',
+            {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-store' },
+            },
+        )
         publicSettingsCache = null
         apiSettingsPrefetch = null
         return response.data
