@@ -1062,7 +1062,7 @@ async function ensureCustomDomainDns(env: Bindings, zone: CloudflareZone, hostna
   } catch (err: any) {
     throw new Error(
       err instanceof CloudflareApiRequestError
-        ? `Cloudflare added the Worker custom domain, but ${hostname} still has no public DNS record. Add Zone DNS Edit permission to CLOUDFLARE_API_TOKEN so DyeInk can create the missing DNS record automatically. Cloudflare error: ${err.message}`
+        ? `Cloudflare added the Worker custom domain, but ${hostname} still has no public DNS record. Update CLOUDFLARE_API_TOKEN so it has Zone > DNS > Edit permission scoped to the ${zone.name || hostname} zone, then reconnect. Cloudflare error: ${err.message}`
         : err.message || `Could not verify DNS records for ${hostname}`,
     )
   }
@@ -1077,7 +1077,7 @@ async function ensureCustomDomainDns(env: Bindings, zone: CloudflareZone, hostna
     } catch (err: any) {
       throw new Error(
         err instanceof CloudflareApiRequestError
-          ? `Cloudflare added the Worker custom domain, but ${hostname} is NXDOMAIN and DyeInk could not create the missing DNS record. Add Zone DNS Edit permission to CLOUDFLARE_API_TOKEN, then reconnect. Cloudflare error: ${err.message}`
+          ? `Cloudflare added the Worker custom domain, but ${hostname} is NXDOMAIN and DyeInk could not create the missing DNS record. Update CLOUDFLARE_API_TOKEN so it has Zone > DNS > Edit permission scoped to the ${zone.name || hostname} zone, then reconnect. Cloudflare error: ${err.message}`
           : err.message || `Could not create DNS record for ${hostname}`,
       )
     }
@@ -1545,8 +1545,9 @@ async function connectCustomDomain(c: AppCtx) {
     )
   }
 
+  let attachedDomain: CloudflareWorkerDomain | null = null
   try {
-    const domain = await attachCloudflareDomain(c.env, hostname, zone)
+    attachedDomain = await attachCloudflareDomain(c.env, hostname, zone)
     const dns = await ensureCustomDomainDns(c.env, zone, hostname)
     const status: DomainStatus = dns.resolvable ? 'verified' : 'pending'
     const settings = await saveDomainSettings(c, hostname, status)
@@ -1561,19 +1562,34 @@ async function connectCustomDomain(c: AppCtx) {
       hostname,
       status,
       message,
-      domain,
+      domain: attachedDomain,
     }
     return c.json({ ...result, settings })
   } catch (err: any) {
-    await saveDomainSettings(c, hostname, 'failed')
+    if (attachedDomain?.id) {
+      c.executionCtx.waitUntil(
+        detachCloudflareDomain(c.env, attachedDomain.id).catch((detachErr) => console.error(detachErr)),
+      )
+    }
+    const settings = await saveDomainSettings(c, null, null)
+    const error =
+      err instanceof CloudflareApiRequestError
+        ? err.message
+        : err.message || 'Failed to add domain to Cloudflare'
     return c.json(
       {
         success: false,
         hostname,
-        error:
-          err instanceof CloudflareApiRequestError
-            ? err.message
-            : err.message || 'Failed to add domain to Cloudflare',
+        status: 'failed',
+        error,
+        settings,
+        instructions: {
+          steps: [
+            'Open Cloudflare Dashboard > Manage Account > Account API Tokens.',
+            'Edit or recreate CLOUDFLARE_API_TOKEN with Workers Scripts Edit, Zone Read, and Zone DNS Edit.',
+            `Scope the zone resource to ${zone.name || hostname}, redeploy the Worker, then click Connect domain again.`,
+          ],
+        },
       },
       502,
     )

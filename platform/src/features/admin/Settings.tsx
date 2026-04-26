@@ -128,6 +128,9 @@ export default function Settings() {
                 setDomainMessage(result.error || 'Failed to connect domain')
                 setDomainInstructions(result.instructions?.steps || [])
                 setDomainStatus(result.status || 'failed')
+                if (result.settings) {
+                    updateSettingsInCache(result.settings)
+                }
                 addToast({ type: 'error', message: result.error || 'Failed to connect domain' })
                 return
             }
