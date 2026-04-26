@@ -791,6 +791,14 @@ type CloudflareWorkerDomain = {
   zone_name: string
 }
 
+type CloudflareDnsRecord = {
+  id: string
+  name: string
+  type: string
+  content: string
+  proxied?: boolean
+}
+
 type DomainConnectResult = {
   success: boolean
   verified: boolean
@@ -798,6 +806,10 @@ type DomainConnectResult = {
   status: DomainStatus
   message: string
   domain?: CloudflareWorkerDomain
+  instructions?: {
+    target?: string
+    steps?: string[]
+  }
 }
 
 class CloudflareApiRequestError extends Error {
@@ -811,6 +823,9 @@ class CloudflareApiRequestError extends Error {
     this.errors = errors
   }
 }
+
+const WORKER_DNS_FALLBACK_TYPE = 'AAAA'
+const WORKER_DNS_FALLBACK_CONTENT = '100::'
 
 function normalizeHostname(input: unknown) {
   if (typeof input !== 'string') throw new Error('Domain is required')
@@ -966,6 +981,198 @@ async function detachCloudflareDomain(env: Bindings, domainId: string) {
   return cloudflareApi<{ success: true }>(env, `/accounts/${accountId}/workers/domains/${domainId}`, {
     method: 'DELETE',
   })
+}
+
+async function listCloudflareDnsRecords(env: Bindings, zoneId: string, hostname: string) {
+  const params = new URLSearchParams({
+    name: hostname,
+    per_page: '100',
+  })
+  return cloudflareApi<CloudflareDnsRecord[]>(
+    env,
+    `/zones/${zoneId}/dns_records?${params.toString()}`,
+  )
+}
+
+async function createCloudflareWorkerDnsFallback(env: Bindings, zoneId: string, hostname: string) {
+  return cloudflareApi<CloudflareDnsRecord>(env, `/zones/${zoneId}/dns_records`, {
+    method: 'POST',
+    body: JSON.stringify({
+      type: WORKER_DNS_FALLBACK_TYPE,
+      name: hostname,
+      content: WORKER_DNS_FALLBACK_CONTENT,
+      ttl: 1,
+      proxied: true,
+    }),
+  })
+}
+
+async function deleteCloudflareDnsRecord(env: Bindings, zoneId: string, recordId: string) {
+  return cloudflareApi<{ id: string }>(env, `/zones/${zoneId}/dns_records/${recordId}`, {
+    method: 'DELETE',
+  })
+}
+
+async function deleteCloudflareWorkerDnsFallback(env: Bindings, zoneId: string, hostname: string) {
+  const records = await listCloudflareDnsRecords(env, zoneId, hostname)
+  const fallbackRecords = records.filter(
+    (record) =>
+      record.name.toLowerCase() === hostname &&
+      record.type === WORKER_DNS_FALLBACK_TYPE &&
+      record.content === WORKER_DNS_FALLBACK_CONTENT,
+  )
+  await Promise.allSettled(
+    fallbackRecords.map((record) => deleteCloudflareDnsRecord(env, zoneId, record.id)),
+  )
+}
+
+function isCloudflarePermissionError(err: unknown) {
+  return (
+    err instanceof CloudflareApiRequestError &&
+    (err.status === 401 ||
+      err.status === 403 ||
+      /auth|permission|not authorized|not authorised/i.test(err.message))
+  )
+}
+
+function dnsRecordLabel(hostname: string, zoneName?: string) {
+  if (!zoneName) return hostname
+  if (hostname === zoneName) return '@'
+  const suffix = `.${zoneName}`
+  return hostname.endsWith(suffix) ? hostname.slice(0, -suffix.length) : hostname
+}
+
+function manualDnsSteps(hostname: string, zone: CloudflareZone) {
+  return [
+    `Open Cloudflare DNS for ${zone.name || hostname}.`,
+    `Add a proxied ${WORKER_DNS_FALLBACK_TYPE} record: name "${dnsRecordLabel(
+      hostname,
+      zone.name,
+    )}", content "${WORKER_DNS_FALLBACK_CONTENT}".`,
+    'Keep the Worker custom domain attached. Refresh after DNS resolves.',
+  ]
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function hasResolvablePublicDns(hostname: string) {
+  const query = async (type: 'A' | 'AAAA' | 'CNAME') => {
+    const url = new URL('https://cloudflare-dns.com/dns-query')
+    url.searchParams.set('name', hostname)
+    url.searchParams.set('type', type)
+    const response = await fetch(url.toString(), {
+      headers: { Accept: 'application/dns-json' },
+    })
+    if (!response.ok) return false
+    const payload = (await response.json().catch(() => null)) as {
+      Status?: number
+      Answer?: unknown[]
+    } | null
+    return payload?.Status === 0 && Array.isArray(payload.Answer) && payload.Answer.length > 0
+  }
+
+  return (await query('A')) || (await query('AAAA')) || (await query('CNAME'))
+}
+
+async function waitForResolvableDns(hostname: string, attempts = 6) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (await hasResolvablePublicDns(hostname)) return true
+    if (attempt < attempts - 1) await wait(900)
+  }
+  return false
+}
+
+async function resolveCustomDomainDns(env: Bindings, zone: CloudflareZone, hostname: string) {
+  if (await waitForResolvableDns(hostname, 3)) {
+    return {
+      verified: true,
+      status: 'verified' as DomainStatus,
+      message: 'Domain connected and DNS is resolving. SSL may still take a few minutes.',
+      instructions: undefined,
+    }
+  }
+
+  let records: CloudflareDnsRecord[]
+  try {
+    records = await listCloudflareDnsRecords(env, zone.id, hostname)
+  } catch (err) {
+    const permissionBlocked = isCloudflarePermissionError(err)
+    return {
+      verified: false,
+      status: 'pending' as DomainStatus,
+      message: permissionBlocked
+        ? 'Domain attached, but DNS is still missing and this token cannot repair DNS automatically.'
+        : 'Domain attached, but DNS is not resolving yet.',
+      instructions: {
+        steps: permissionBlocked
+          ? [
+              'The Worker custom domain was attached, but DNS is NXDOMAIN.',
+              'Either wait a few minutes for Cloudflare custom-domain DNS, or add the DNS record below manually.',
+              ...manualDnsSteps(hostname, zone),
+            ]
+          : manualDnsSteps(hostname, zone),
+      },
+    }
+  }
+
+  const hasProxiedWebRecord = records.some(
+    (record) =>
+      ['A', 'AAAA', 'CNAME'].includes(record.type) &&
+      record.name.toLowerCase() === hostname &&
+      record.proxied,
+  )
+
+  if (!hasProxiedWebRecord && records.length === 0) {
+    try {
+      await createCloudflareWorkerDnsFallback(env, zone.id, hostname)
+      if (await waitForResolvableDns(hostname, 6)) {
+        return {
+          verified: true,
+          status: 'verified' as DomainStatus,
+          message: 'Domain connected and missing DNS was repaired automatically.',
+          instructions: undefined,
+        }
+      }
+      return {
+        verified: false,
+        status: 'pending' as DomainStatus,
+        message: 'Domain connected and DNS record was created. DNS is still propagating.',
+        instructions: { steps: ['Wait a few minutes, then open the custom domain again.'] },
+      }
+    } catch (err) {
+      return {
+        verified: false,
+        status: 'pending' as DomainStatus,
+        message: isCloudflarePermissionError(err)
+          ? 'Domain attached, but DNS is still missing and this token cannot repair DNS automatically.'
+          : 'Domain attached, but DyeInk could not create the missing DNS record.',
+        instructions: {
+          steps: [
+            'The Worker custom domain was attached, but DNS is NXDOMAIN.',
+            ...manualDnsSteps(hostname, zone),
+          ],
+        },
+      }
+    }
+  }
+
+  if (await waitForResolvableDns(hostname, 6)) {
+    return {
+      verified: true,
+      status: 'verified' as DomainStatus,
+      message: 'Domain connected and DNS is resolving. SSL may still take a few minutes.',
+      instructions: undefined,
+    }
+  }
+
+  return {
+    verified: false,
+    status: 'pending' as DomainStatus,
+    message: 'Domain attached, but DNS is still propagating.',
+    instructions: { steps: ['Wait a few minutes, then open the custom domain again.'] },
+  }
 }
 
 async function getSettingsPayload(db: D1Database) {
@@ -1421,15 +1628,16 @@ async function connectCustomDomain(c: AppCtx) {
   let attachedDomain: CloudflareWorkerDomain | null = null
   try {
     attachedDomain = await attachCloudflareDomain(c.env, hostname, zone)
-    const status: DomainStatus = 'verified'
-    const settings = await saveDomainSettings(c, hostname, status)
+    const resolution = await resolveCustomDomainDns(c.env, zone, hostname)
+    const settings = await saveDomainSettings(c, hostname, resolution.status)
     const result: DomainConnectResult = {
       success: true,
-      verified: true,
+      verified: resolution.verified,
       hostname,
-      status,
-      message: 'Domain connected. Cloudflare will create DNS and issue SSL automatically; this can take a few minutes.',
+      status: resolution.status,
+      message: resolution.message,
       domain: attachedDomain,
+      instructions: resolution.instructions,
     }
     return c.json({ ...result, settings })
   } catch (err: any) {
@@ -1458,10 +1666,12 @@ async function disconnectCustomDomain(c: AppCtx) {
   const config = getCloudflareAccountConfig(c.env)
   if (hostname && config.missing.length === 0) {
     try {
+      const zone = await findCloudflareZone(c.env, hostname)
       const domains = await listCloudflareDomains(c.env, hostname)
-      const results = await Promise.allSettled(
-        domains.map((domain) => detachCloudflareDomain(c.env, domain.id)),
-      )
+      const results = await Promise.allSettled([
+        ...domains.map((domain) => detachCloudflareDomain(c.env, domain.id)),
+        ...(zone ? [deleteCloudflareWorkerDnsFallback(c.env, zone.id, hostname)] : []),
+      ])
       if (results.some((result) => result.status === 'rejected')) {
         warning = 'Local domain settings were cleared, but Cloudflare could not remove every Worker domain binding.'
       }

@@ -139,13 +139,15 @@ export default function Settings() {
             setDomainStatus(nextStatus)
             setCustomDomain(result.hostname || customDomain)
             setDomainMessage(result.message || 'Domain connected.')
+            setDomainInstructions(result.instructions?.steps || [])
             if (result.settings) {
                 updateSettingsInCache(result.settings)
             }
             await fetchSettings(true)
             addToast({
-                type: 'success',
+                type: result.verified ? 'success' : 'warning',
                 message: result.message || 'Domain connected! SSL is being issued. This can take 5–20 minutes.',
+                duration: result.verified ? undefined : 8000,
             })
         } catch (err: any) {
             setDomainStatus('failed')

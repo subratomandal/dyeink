@@ -42,6 +42,8 @@ D1_HIT_ROLLUPS = "on"
 
 # Optional one-click custom domain connection from Settings.
 # Add CLOUDFLARE_API_TOKEN as a secret with Workers Scripts Write permission.
+# Zone DNS Edit is optional, but lets DyeInk repair NXDOMAIN automatically if
+# Cloudflare accepts the custom domain before DNS is visible.
 # Add CLOUDFLARE_ACCOUNT_ID as a runtime variable/secret. If the token cannot
 # list zones, also add CLOUDFLARE_ZONE_ID and CLOUDFLARE_ZONE_NAME.
 # CLOUDFLARE_WORKER_NAME defaults to "dyeink".

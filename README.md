@@ -164,7 +164,9 @@ Required repository secrets:
 
 For the in-app custom-domain button, the token must include Workers Scripts Edit.
 If the token cannot list zones, also set `CLOUDFLARE_ZONE_ID` and
-`CLOUDFLARE_ZONE_NAME` in the deployed Worker variables.
+`CLOUDFLARE_ZONE_NAME` in the deployed Worker variables. `Zone DNS Edit` is
+optional, but lets DyeInk repair NXDOMAIN automatically when Cloudflare accepts
+the custom domain before DNS is visible.
 
 Optional workflow input:
 
