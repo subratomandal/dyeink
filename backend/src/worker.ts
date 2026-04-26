@@ -791,15 +791,6 @@ type CloudflareWorkerDomain = {
   zone_name: string
 }
 
-type CloudflareDnsRecord = {
-  id: string
-  name: string
-  type: string
-  content: string
-  proxied?: boolean
-  comment?: string
-}
-
 type DomainConnectResult = {
   success: boolean
   verified: boolean
@@ -820,9 +811,6 @@ class CloudflareApiRequestError extends Error {
     this.errors = errors
   }
 }
-
-const DYEINK_FALLBACK_DNS_CONTENT = '192.0.2.1'
-const DYEINK_FALLBACK_DNS_COMMENT = 'DyeInk Worker custom-domain DNS fallback'
 
 function normalizeHostname(input: unknown) {
   if (typeof input !== 'string') throw new Error('Domain is required')
@@ -978,121 +966,6 @@ async function detachCloudflareDomain(env: Bindings, domainId: string) {
   return cloudflareApi<{ success: true }>(env, `/accounts/${accountId}/workers/domains/${domainId}`, {
     method: 'DELETE',
   })
-}
-
-async function listCloudflareDnsRecords(env: Bindings, zoneId: string, hostname: string) {
-  const params = new URLSearchParams({
-    name: hostname,
-    per_page: '100',
-  })
-  return cloudflareApi<CloudflareDnsRecord[]>(
-    env,
-    `/zones/${zoneId}/dns_records?${params.toString()}`,
-  )
-}
-
-async function createCloudflareDnsFallbackRecord(
-  env: Bindings,
-  zoneId: string,
-  hostname: string,
-) {
-  return cloudflareApi<CloudflareDnsRecord>(env, `/zones/${zoneId}/dns_records`, {
-    method: 'POST',
-    body: JSON.stringify({
-      type: 'A',
-      name: hostname,
-      content: DYEINK_FALLBACK_DNS_CONTENT,
-      ttl: 1,
-      proxied: true,
-      comment: DYEINK_FALLBACK_DNS_COMMENT,
-    }),
-  })
-}
-
-async function deleteCloudflareDnsRecord(env: Bindings, zoneId: string, recordId: string) {
-  return cloudflareApi<{ id: string }>(env, `/zones/${zoneId}/dns_records/${recordId}`, {
-    method: 'DELETE',
-  })
-}
-
-async function deleteCloudflareDnsFallbackRecords(
-  env: Bindings,
-  zoneId: string,
-  hostname: string,
-) {
-  const records = await listCloudflareDnsRecords(env, zoneId, hostname)
-  const fallbackRecords = records.filter(
-    (record) =>
-      record.type === 'A' &&
-      record.name.toLowerCase() === hostname &&
-      record.content === DYEINK_FALLBACK_DNS_CONTENT,
-  )
-  await Promise.allSettled(
-    fallbackRecords.map((record) => deleteCloudflareDnsRecord(env, zoneId, record.id)),
-  )
-}
-
-async function hasResolvablePublicDns(hostname: string) {
-  const query = async (type: 'A' | 'AAAA' | 'CNAME') => {
-    const url = new URL('https://cloudflare-dns.com/dns-query')
-    url.searchParams.set('name', hostname)
-    url.searchParams.set('type', type)
-    const response = await fetch(url.toString(), {
-      headers: { Accept: 'application/dns-json' },
-    })
-    if (!response.ok) return false
-    const payload = (await response.json().catch(() => null)) as {
-      Status?: number
-      Answer?: unknown[]
-    } | null
-    return payload?.Status === 0 && Array.isArray(payload.Answer) && payload.Answer.length > 0
-  }
-
-  return (await query('A')) || (await query('AAAA')) || (await query('CNAME'))
-}
-
-async function ensureCustomDomainDns(env: Bindings, zone: CloudflareZone, hostname: string) {
-  if (await hasResolvablePublicDns(hostname)) {
-    return { resolvable: true, createdFallback: false }
-  }
-
-  let records: CloudflareDnsRecord[]
-  try {
-    records = await listCloudflareDnsRecords(env, zone.id, hostname)
-  } catch (err: any) {
-    throw new Error(
-      err instanceof CloudflareApiRequestError
-        ? `Cloudflare added the Worker custom domain, but ${hostname} still has no public DNS record. Update CLOUDFLARE_API_TOKEN so it has Zone > DNS > Edit permission scoped to the ${zone.name || hostname} zone, then reconnect. Cloudflare error: ${err.message}`
-        : err.message || `Could not verify DNS records for ${hostname}`,
-    )
-  }
-
-  if (records.length === 0) {
-    try {
-      await createCloudflareDnsFallbackRecord(env, zone.id, hostname)
-      return {
-        resolvable: await hasResolvablePublicDns(hostname),
-        createdFallback: true,
-      }
-    } catch (err: any) {
-      throw new Error(
-        err instanceof CloudflareApiRequestError
-          ? `Cloudflare added the Worker custom domain, but ${hostname} is NXDOMAIN and DyeInk could not create the missing DNS record. Update CLOUDFLARE_API_TOKEN so it has Zone > DNS > Edit permission scoped to the ${zone.name || hostname} zone, then reconnect. Cloudflare error: ${err.message}`
-          : err.message || `Could not create DNS record for ${hostname}`,
-      )
-    }
-  }
-
-  if (records.some((record) => record.proxied)) {
-    return {
-      resolvable: await hasResolvablePublicDns(hostname),
-      createdFallback: false,
-    }
-  }
-
-  throw new Error(
-    `${hostname} already has DNS records, but none are proxied through Cloudflare. Turn the DNS record orange-cloud/proxied or remove the conflicting records, then reconnect.`,
-  )
 }
 
 async function getSettingsPayload(db: D1Database) {
@@ -1548,48 +1421,27 @@ async function connectCustomDomain(c: AppCtx) {
   let attachedDomain: CloudflareWorkerDomain | null = null
   try {
     attachedDomain = await attachCloudflareDomain(c.env, hostname, zone)
-    const dns = await ensureCustomDomainDns(c.env, zone, hostname)
-    const status: DomainStatus = dns.resolvable ? 'verified' : 'pending'
+    const status: DomainStatus = 'verified'
     const settings = await saveDomainSettings(c, hostname, status)
-    const message = dns.resolvable
-      ? 'Domain connected! SSL is being issued. This can take 5–20 minutes.'
-      : dns.createdFallback
-        ? 'Domain connected and the missing DNS record was created. DNS may take a minute to resolve.'
-        : 'Domain connected, but DNS is still propagating. Try the domain again in a few minutes.'
     const result: DomainConnectResult = {
       success: true,
-      verified: dns.resolvable,
+      verified: true,
       hostname,
       status,
-      message,
+      message: 'Domain connected. Cloudflare will create DNS and issue SSL automatically; this can take a few minutes.',
       domain: attachedDomain,
     }
     return c.json({ ...result, settings })
   } catch (err: any) {
-    if (attachedDomain?.id) {
-      c.executionCtx.waitUntil(
-        detachCloudflareDomain(c.env, attachedDomain.id).catch((detachErr) => console.error(detachErr)),
-      )
-    }
-    const settings = await saveDomainSettings(c, null, null)
-    const error =
-      err instanceof CloudflareApiRequestError
-        ? err.message
-        : err.message || 'Failed to add domain to Cloudflare'
     return c.json(
       {
         success: false,
         hostname,
         status: 'failed',
-        error,
-        settings,
-        instructions: {
-          steps: [
-            'Open Cloudflare Dashboard > Manage Account > Account API Tokens.',
-            'Edit or recreate CLOUDFLARE_API_TOKEN with Workers Scripts Edit, Zone Read, and Zone DNS Edit.',
-            `Scope the zone resource to ${zone.name || hostname}, redeploy the Worker, then click Connect domain again.`,
-          ],
-        },
+        error:
+          err instanceof CloudflareApiRequestError
+            ? err.message
+            : err.message || 'Failed to add domain to Cloudflare',
       },
       502,
     )
@@ -1606,12 +1458,10 @@ async function disconnectCustomDomain(c: AppCtx) {
   const config = getCloudflareAccountConfig(c.env)
   if (hostname && config.missing.length === 0) {
     try {
-      const zone = await findCloudflareZone(c.env, hostname)
       const domains = await listCloudflareDomains(c.env, hostname)
-      const results = await Promise.allSettled([
-        ...domains.map((domain) => detachCloudflareDomain(c.env, domain.id)),
-        ...(zone ? [deleteCloudflareDnsFallbackRecords(c.env, zone.id, hostname)] : []),
-      ])
+      const results = await Promise.allSettled(
+        domains.map((domain) => detachCloudflareDomain(c.env, domain.id)),
+      )
       if (results.some((result) => result.status === 'rejected')) {
         warning = 'Local domain settings were cleared, but Cloudflare could not remove every Worker domain binding.'
       }

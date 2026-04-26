@@ -162,9 +162,9 @@ Required repository secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-For the in-app custom-domain button, the token must include Workers Scripts Edit,
-Zone Read, and DNS Edit so DyeInk can repair missing DNS records when Cloudflare
-does not create them automatically.
+For the in-app custom-domain button, the token must include Workers Scripts Edit.
+If the token cannot list zones, also set `CLOUDFLARE_ZONE_ID` and
+`CLOUDFLARE_ZONE_NAME` in the deployed Worker variables.
 
 Optional workflow input:
 
