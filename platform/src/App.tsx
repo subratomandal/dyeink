@@ -45,56 +45,88 @@ function RootRoute() {
     return <Landing />
 }
 
+function isDefaultAppHost(hostname: string) {
+    const normalized = hostname.toLowerCase().replace(/\.$/, '')
+    return (
+        normalized === 'localhost' ||
+        normalized === '127.0.0.1' ||
+        normalized === '0.0.0.0' ||
+        normalized.endsWith('.workers.dev') ||
+        normalized.endsWith('.pages.dev')
+    )
+}
+
+function isBlogPath(pathname: string) {
+    return pathname === '/blog' || pathname.startsWith('/blog/')
+}
+
+function AppRoutes() {
+    const currentPath = window.location.pathname
+    const isCustomHost = typeof window !== 'undefined' && !isDefaultAppHost(window.location.hostname)
+
+    if (isCustomHost && !isBlogPath(currentPath)) {
+        return (
+            <Routes>
+                <Route path="*" element={<Navigate to="/blog" replace />} />
+            </Routes>
+        )
+    }
+
+    return (
+        <Routes>
+            <Route path="/" element={<RootRoute />} />
+
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<Blog />} />
+
+            <Route path="/login" element={<Login />} />
+            <Route path="/setup" element={<Setup />} />
+
+            <Route
+                path="/admin"
+                element={
+                    <ProtectedRoute>
+                        <SimpleErrorBoundary>
+                            <AdminLayout />
+                        </SimpleErrorBoundary>
+                    </ProtectedRoute>
+                }
+            >
+                <Route index element={<Dashboard />} />
+                <Route path="posts" element={<Posts />} />
+                <Route path="stats" element={<Stats />} />
+                <Route path="settings" element={<Settings />} />
+            </Route>
+
+            <Route
+                path="/admin/posts/new"
+                element={
+                    <ProtectedRoute>
+                        <Editor />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/admin/posts/:id/edit"
+                element={
+                    <ProtectedRoute>
+                        <Editor />
+                    </ProtectedRoute>
+                }
+            />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+    )
+}
+
 function App() {
     return (
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <TooltipProvider>
                 <ThemeInit />
                 <ToastContainer />
-                <Routes>
-                    <Route path="/" element={<RootRoute />} />
-
-                    <Route path="/blog" element={<Blog />} />
-                    <Route path="/blog/:slug" element={<Blog />} />
-
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/setup" element={<Setup />} />
-
-                    <Route
-                        path="/admin"
-                        element={
-                            <ProtectedRoute>
-                                <SimpleErrorBoundary>
-                                    <AdminLayout />
-                                </SimpleErrorBoundary>
-                            </ProtectedRoute>
-                        }
-                    >
-                        <Route index element={<Dashboard />} />
-                        <Route path="posts" element={<Posts />} />
-                        <Route path="stats" element={<Stats />} />
-                        <Route path="settings" element={<Settings />} />
-                    </Route>
-
-                    <Route
-                        path="/admin/posts/new"
-                        element={
-                            <ProtectedRoute>
-                                <Editor />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin/posts/:id/edit"
-                        element={
-                            <ProtectedRoute>
-                                <Editor />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                <AppRoutes />
             </TooltipProvider>
         </BrowserRouter>
     )

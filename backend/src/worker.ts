@@ -1248,7 +1248,13 @@ async function enforceCustomDomainBlogBoundary(c: AppCtx, next: Next) {
 
   url.pathname = '/blog'
   url.search = ''
-  return c.redirect(url.toString(), 302)
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: url.toString(),
+      'cache-control': 'no-store, max-age=0',
+    },
+  })
 }
 
 function isConnectedDomainStatus(status: string | null | undefined) {
