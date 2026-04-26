@@ -15,6 +15,14 @@ DyeInk is a single-admin blog for Cloudflare Workers. It uses D1 for data, R2 fo
   <a href="https://github.com/subratomandal/dyeink/stargazers"><img src="https://img.shields.io/github/stars/subratomandal/dyeink?style=for-the-badge" alt="GitHub stars" /></a>
 </p>
 
+## Screenshots
+
+![Landing page](docs/screenshots/landing.png)
+
+![Admin dashboard](docs/screenshots/admin-dashboard.png)
+
+![Public blog post](docs/screenshots/blog-post.png)
+
 ## Features
 
 - Public blog with search, pagination, post pages, share tracking, view tracking, newsletter signup, and social links.
