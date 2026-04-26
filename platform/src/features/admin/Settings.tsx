@@ -164,11 +164,18 @@ export default function Settings() {
             const result = await settingsService.disconnectDomain()
             setCustomDomain('')
             setDomainStatus(null)
+            setDomainMessage(result.warning || 'Custom domain disconnected.')
             if (result.settings) {
                 updateSettingsInCache(result.settings)
+            } else if (settings) {
+                updateSettingsInCache({ ...settings, customDomain: null, domainStatus: null })
             }
             await fetchSettings(true)
-            addToast({ type: 'success', message: 'Custom domain disconnected.' })
+            addToast({
+                type: result.warning ? 'warning' : 'success',
+                message: result.warning || 'Custom domain disconnected.',
+                duration: result.warning ? 8000 : undefined,
+            })
         } catch (err: any) {
             addToast({
                 type: 'error',

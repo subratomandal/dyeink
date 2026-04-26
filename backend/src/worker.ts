@@ -973,14 +973,6 @@ async function getSettingsPayload(db: D1Database) {
   return serializeSettings(row)
 }
 
-async function getPublicDomainRoutingSettings(env: Bindings) {
-  await ensureSchema(env.DB)
-  return env.DB.prepare('SELECT custom_domain, domain_status FROM site_settings WHERE id = 1').first<{
-    custom_domain: string | null
-    domain_status: string | null
-  }>()
-}
-
 function requestHostname(c: AppCtx) {
   return new URL(c.req.url).hostname.toLowerCase().replace(/\.$/, '')
 }
@@ -1037,12 +1029,6 @@ function isCustomDomainPublicSupportPath(c: AppCtx, pathname: string) {
 async function enforceCustomDomainBlogBoundary(c: AppCtx, next: Next) {
   const host = requestHostname(c)
   if (isLocalHostname(host) || isWorkersPreviewHostname(host)) return next()
-
-  const routingSettings = await getPublicDomainRoutingSettings(c.env).catch(() => null)
-  const customDomain = normalizeStoredHostname(routingSettings?.custom_domain)
-  if (!customDomain || host !== customDomain || !isConnectedDomainStatus(routingSettings?.domain_status)) {
-    return next()
-  }
 
   const url = new URL(c.req.url)
   if (isPublicBlogPath(url.pathname) || isCustomDomainPublicSupportPath(c, url.pathname)) {
@@ -1462,29 +1448,35 @@ async function connectCustomDomain(c: AppCtx) {
 async function disconnectCustomDomain(c: AppCtx) {
   const row = await c.env.DB.prepare('SELECT * FROM site_settings WHERE id = 1')
     .first<SettingsRow>()
-  const hostname = row?.custom_domain
+  const hostname = normalizeStoredHostname(row?.custom_domain)
+  const settings = await saveDomainSettings(c, null, null)
+  let warning: string | undefined
 
   const config = getCloudflareAccountConfig(c.env)
   if (hostname && config.missing.length === 0) {
     try {
       const domains = await listCloudflareDomains(c.env, hostname)
-      await Promise.all(domains.map((domain) => detachCloudflareDomain(c.env, domain.id)))
-    } catch (err: any) {
-      return c.json(
-        {
-          ok: false,
-          error:
-            err instanceof CloudflareApiRequestError
-              ? err.message
-              : err.message || 'Failed to remove domain from Cloudflare',
-        },
-        502,
+      const results = await Promise.allSettled(
+        domains.map((domain) => detachCloudflareDomain(c.env, domain.id)),
       )
+      if (results.some((result) => result.status === 'rejected')) {
+        warning = 'Local domain settings were cleared, but Cloudflare could not remove every Worker domain binding.'
+      }
+    } catch (err: any) {
+      warning =
+        err instanceof CloudflareApiRequestError
+          ? `Local domain settings were cleared, but Cloudflare detach failed: ${err.message}`
+          : `Local domain settings were cleared, but Cloudflare detach failed: ${
+              err.message || 'unknown error'
+            }`
     }
+  } else if (hostname && config.missing.length > 0) {
+    warning = `Local domain settings were cleared, but Cloudflare detach was skipped because ${config.missing.join(
+      ' and ',
+    )} is missing.`
   }
 
-  const settings = await saveDomainSettings(c, null, null)
-  return c.json({ ok: true, settings })
+  return c.json({ ok: true, settings, warning })
 }
 
 app.post('/api/add-domain', requireAuth, connectCustomDomain)
@@ -1718,25 +1710,6 @@ app.get('/img/:key', async (c) => {
 // ==========================================================================
 
 app.all('*', async (c) => {
-  const url = new URL(c.req.url)
-
-  if (!isStaticAssetPath(url.pathname)) {
-    const routingSettings = await getPublicDomainRoutingSettings(c.env).catch(() => null)
-    const customDomain = normalizeStoredHostname(routingSettings?.custom_domain)
-    const host = requestHostname(c)
-
-    if (customDomain && isConnectedDomainStatus(routingSettings?.domain_status)) {
-      const isCustomDomain = host === customDomain
-      const isPublicBlogRoute = isPublicBlogPath(url.pathname)
-
-      if (isCustomDomain && !isPublicBlogRoute) {
-        url.pathname = '/blog'
-        url.search = ''
-        return c.redirect(url.toString(), 302)
-      }
-    }
-  }
-
   return c.env.ASSETS.fetch(c.req.raw)
 })
 

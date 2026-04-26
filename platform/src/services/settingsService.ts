@@ -151,8 +151,8 @@ export const settingsService = {
         }
     },
 
-    async disconnectDomain(): Promise<{ ok: boolean; settings?: SiteSettings }> {
-        const response = await apiClient.delete<{ ok: boolean; settings?: SiteSettings }>('/add-domain')
+    async disconnectDomain(): Promise<{ ok: boolean; settings?: SiteSettings; warning?: string }> {
+        const response = await apiClient.delete<{ ok: boolean; settings?: SiteSettings; warning?: string }>('/add-domain')
         publicSettingsCache = null
         apiSettingsPrefetch = null
         return response.data
