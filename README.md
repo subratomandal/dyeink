@@ -1,105 +1,130 @@
-<small>
-
 # DyeInk
 
 ![DyeInk](platform/public/Di.png)
 
-> A production-ready, self-hosted blogging platform for Cloudflare Workers. DyeInk ships with a polished public blog, an admin dashboard, secure first-run setup, D1 persistence, R2 image storage, and one-click Cloudflare deployment.
+DyeInk is a single-admin blog for Cloudflare Workers. It uses D1 for data, R2 for uploads and public JSON artifacts, and a React/Vite app served from the same Worker.
 
 <p align="center">
-  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/subratamondal1/dyeink">
+  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/subratomandal/dyeink">
     <img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare" />
   </a>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-yellow?style=for-the-badge" alt="License: AGPL-3.0" /></a>
-  <a href="https://github.com/subratamondal1/dyeink/stargazers"><img src="https://img.shields.io/github/stars/subratamondal1/dyeink?style=for-the-badge" alt="GitHub stars" /></a>
+  <a href="https://github.com/subratomandal/dyeink/stargazers"><img src="https://img.shields.io/github/stars/subratomandal/dyeink?style=for-the-badge" alt="GitHub stars" /></a>
 </p>
 
----
+## Features
 
-## DyeInk
-
-DyeInk is a full-stack blog system built for Cloudflare's edge runtime. The frontend is a React/Vite application and the backend is a Hono Worker that serves both the API and the built static assets.
-
-It is designed to be deployed without a separate server. Cloudflare Workers serves the application, D1 stores content and settings, and R2 stores uploaded images.
-
-## What You Get
-
-- Public blog with search, pagination, post pages, view tracking, share tracking, optional newsletter modal, and configurable profile/social links.
-- Admin setup flow that creates the first administrator on first run.
-- Secure admin authentication with signed HttpOnly cookies, PBKDF2-SHA256 password hashing, strict password policy, and login rate limiting.
-- Admin dashboard for published posts, editor workflow, site settings, stats, uploads, and subscriber data.
-- Native rich-text editor using `contentEditable`, toolbar controls, sanitized HTML rendering, image upload, and image removal from editor content.
-- Cloudflare D1 schema initialization on first API request, with migrations also kept in the repo for explicit database management.
-- Cloudflare R2 image storage with optional public bucket URL support.
-- Worker asset serving from one Cloudflare Worker deploy.
+- Public blog with search, pagination, post pages, share tracking, view tracking, newsletter signup, and social links.
+- Admin dashboard for posts, settings, stats, subscribers, image uploads, password changes, and custom-domain connection.
+- Editor with rich-text mode, Markdown/source mode, image upload, sanitized rendering, GitHub-style Markdown, Mermaid, MathJax, and YouTube embeds.
+- First-run setup wizard for creating the admin password.
+- Signed HttpOnly session cookies, PBKDF2-SHA256 password hashing, and login rate limiting.
+- D1 schema creation on first API request, with migrations kept in `backend/migrations`.
+- R2-backed image storage and public JSON artifacts for the public blog.
 
 ## Architecture
 
 ```mermaid
 graph TD
-    A[Visitor / Admin Browser] --> B[Cloudflare Worker]
-    B --> C[React Static Assets]
+    A[Browser] --> B[Cloudflare Worker]
+    B --> C[React static assets]
     B --> D[Hono API]
-    D --> E[(Cloudflare D1)]
-    D --> F[(Cloudflare R2)]
-    D --> G[Signed Session Cookie]
+    D --> E[(D1 database)]
+    D --> F[(R2 bucket)]
+    D --> G[Signed session cookie]
 ```
 
-## Repository Layout
+## Repository
 
 ```txt
 dyeink/
 |-- backend/              # Hono Worker API
-|   |-- migrations/       # D1 migration files
+|   |-- migrations/       # D1 migrations
 |   |-- src/              # Worker source
-|   `-- wrangler.toml     # Backend-local Wrangler config
+|   `-- wrangler.toml     # Backend-local deploy config
 |-- platform/             # React/Vite frontend
 |   |-- public/           # Static public assets
 |   `-- src/              # Frontend source
 |-- scripts/
-|   `-- bundle-worker.mjs # Builds Pages-compatible _worker.js
-|-- wrangler.toml         # Root Cloudflare Workers deploy config
-`-- wrangler.pages.toml   # Optional Cloudflare Pages reference config
+|   `-- bundle-worker.mjs # Builds platform/dist/_worker.js for Pages
+|-- wrangler.toml         # Root Workers deploy config
+`-- wrangler.pages.toml   # Optional Pages binding reference
 ```
 
-## Recommended Deploy
+## Deploy
 
-Use the Cloudflare deploy button:
+Use the deploy button above. Cloudflare will ask for D1 and R2 because `wrangler.toml` declares the `DB` and `IMAGES` bindings.
 
-<p align="center">
-  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/subratamondal1/dyeink">
-    <img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare" />
-  </a>
-</p>
+Use these values in the setup form:
 
-Cloudflare should run:
+| Field | Value |
+| --- | --- |
+| Project name | `dyeink` or your preferred name |
+| D1 database binding | `DB` |
+| D1 database name | `dyeink` |
+| R2 bucket binding | `IMAGES` |
+| R2 bucket name | `dyeink-images` |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Non-production branch deploy command | Leave blank |
+| Path | Leave blank |
+| API token | Let Cloudflare create it |
+
+R2 must be enabled on the Cloudflare account. DyeInk uses it for uploaded images and generated public JSON files.
+
+After deployment, open the Worker URL and complete the setup wizard. The admin password must be at least 12 characters and include lowercase, uppercase, number, and special character.
+
+## Deploy Variables
+
+For a normal deployment, leave optional values blank and keep the defaults shown here.
+
+| Variable | Default | When to set it |
+| --- | --- | --- |
+| `APP_PASSWORD` | Blank | Seed the first admin password and skip the setup wizard. |
+| `R2_PUBLIC_URL` | Blank | Serve images from a public/custom R2 domain instead of `/img/:key`. |
+| `D1_HIT_ROLLUPS` | `on` | Set to `off` only if you do not want D1 view/share counters. |
+| `FRONTEND_ORIGIN` | Blank | Lock API CORS to one origin. |
+| `SITE_URL` | Blank | Base URL for newsletter links when no verified custom domain exists. |
+| `EMAIL_FROM` | Blank | Enable newsletter email through Cloudflare Email Service. |
+| `EMAIL_FROM_NAME` | `DyeInk` | Newsletter sender display name. |
+| `CLOUDFLARE_API_TOKEN` | Blank | Enable in-app custom-domain automation. |
+| `CLOUDFLARE_ACCOUNT_ID` | Blank | Required with `CLOUDFLARE_API_TOKEN`. |
+| `CLOUDFLARE_ZONE_ID` | Blank | Fallback zone ID if the token cannot list zones. |
+| `CLOUDFLARE_ZONE_NAME` | Blank | Fallback zone name if the token cannot list zones. |
+| `CLOUDFLARE_WORKER_NAME` | `dyeink` | Set if the deployed Worker has a different service name. |
+| `CLOUDFLARE_WORKER_ENVIRONMENT` | Blank | Use for environment-scoped Worker domain APIs. |
+| `CUSTOM_DOMAIN_TARGET` | Blank | Override the DNS instruction target. |
+| `VITE_API_BASE_URL` | `/api` | Change only for frontend dev against a remote API. |
+| `VITE_PUBLIC_CONTENT_URL` | Blank | Serve public JSON artifacts from a separate origin. |
+
+## CLI Deploy
 
 ```bash
+npm install
 npm run build
+npx wrangler login
 npx wrangler deploy
 ```
 
-The root `wrangler.toml` is the Workers deploy config. It declares:
+If Wrangler asks for resources, use:
 
-- Worker name: `dyeink`
-- Static assets directory: `platform/dist`
 - D1 binding: `DB`
-- D1 database name: `dyeink`
+- D1 database: `dyeink`
 - R2 binding: `IMAGES`
-- R2 bucket name: `dyeink-images`
+- R2 bucket: `dyeink-images`
 
-For Workers deploys, the config intentionally does not commit a D1 `database_id`. Wrangler can provision the declared resources during deployment. On the first API request, the Worker creates the required D1 tables and indexes if they are missing.
+Optional first-admin password seed:
 
-After deployment, open your site and complete the setup wizard. The password must contain at least 12 characters, including lowercase, uppercase, number, and special character.
+```bash
+npx wrangler secret put APP_PASSWORD
+```
 
-## Cloudflare Pages Note
+## Cloudflare Pages
 
-DyeInk is primarily configured for Cloudflare Workers. If you connect the repository as a Cloudflare Pages project, do not use `npx wrangler deploy` as the Pages deploy command.
-
-For Pages, use:
+Workers is the primary deployment target. For a Pages project, use:
 
 ```bash
 npm run build
@@ -111,172 +136,72 @@ Build output:
 platform/dist
 ```
 
-Pages uses `platform/dist/_worker.js` as the server entrypoint. D1 and R2 must be created and bound in the Pages dashboard, or configured from a Pages-specific config based on `wrangler.pages.toml`. Replace the placeholder D1 `database_id` before using that file for Pages.
+Pages uses `platform/dist/_worker.js` as the server entrypoint. Create and bind D1/R2 in the Pages dashboard, or use `wrangler.pages.toml` as a reference after replacing the placeholder D1 `database_id`.
 
-## Manual CLI Deploy
+## GitHub Actions
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Build:
-
-```bash
-npm run build
-```
-
-Log in to Cloudflare:
-
-```bash
-npx wrangler login
-```
-
-Optionally seed the first admin password from a secret:
-
-```bash
-npx wrangler secret put APP_PASSWORD
-```
-
-Deploy from the repository root:
-
-```bash
-npx wrangler deploy
-```
-
-You can also deploy through the backend package:
-
-```bash
-npm run deploy
-```
-
-That command uses `backend/wrangler.toml`, builds the frontend first, and deploys the Worker with the built assets.
-
-## GitHub Actions Deploy
-
-The included workflow can provision D1/R2, apply migrations, and deploy to Cloudflare.
+The workflow in `.github/workflows/deploy.yml` can create D1/R2, apply migrations, and deploy.
 
 Required repository secrets:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-For the in-app custom-domain button, the token must include Workers Scripts Edit.
-If the token cannot list zones, also set `CLOUDFLARE_ZONE_ID` and
-`CLOUDFLARE_ZONE_NAME` in the deployed Worker variables. `Zone DNS Edit` is
-optional, but lets DyeInk repair NXDOMAIN automatically when Cloudflare accepts
-the custom domain before DNS is visible.
-
 Optional workflow input:
 
-- `app_password` seeds the first admin password through `APP_PASSWORD`.
-
-The workflow patches `backend/wrangler.toml` in the runner with the provisioned D1 database ID, applies migrations, and deploys the Worker. The patch is not committed back to your repository.
+- `app_password`
 
 ## Local Development
 
-Install dependencies:
-
 ```bash
 npm install
-```
-
-Build the frontend once so the Worker has assets to serve:
-
-```bash
 npm run build
-```
-
-Start the Worker locally:
-
-```bash
 cd backend
 npm run dev
 ```
 
-The Worker runs on:
+Worker URL:
 
 ```txt
 http://127.0.0.1:8787
 ```
 
-For frontend-only development, run Vite:
+Frontend-only Vite dev:
 
 ```bash
 cd platform
 npm run dev
 ```
 
-The Vite dev server proxies `/api` and `/img` requests to the local Worker.
+The Vite server proxies `/api` and `/img` to the local Worker.
 
-Optional local D1 migration command:
+Optional local migration:
 
 ```bash
 npm run db:migrate:local
 ```
 
-The Worker also initializes the schema automatically on first API request, so local migrations are useful for explicit database management but are not required for first-run setup.
-
-## Environment Variables
-
-No environment variable is required for the basic first-run setup.
-
-Optional runtime variables:
-
-- `APP_PASSWORD` seeds the first admin password when no admin exists.
-- `R2_PUBLIC_URL` serves image URLs directly from a public R2/custom domain instead of proxying through `/img`.
-- `FRONTEND_ORIGIN` controls the allowed CORS origin for API requests.
-- `D1_HIT_ROLLUPS` controls D1 view/share counters. The default is `on`.
-- `SITE_URL` sets the base URL used in newsletter links when no verified custom domain is connected.
-- `EMAIL_FROM` and `EMAIL_FROM_NAME` enable newsletter sending when an `EMAIL` send-email binding is configured.
-- `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` enable the in-app custom-domain connection button.
-- `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_ZONE_NAME` are optional fallbacks when the token cannot list zones.
-- `CLOUDFLARE_WORKER_NAME` is optional when the deployed Worker is not named `dyeink`.
-- `CLOUDFLARE_WORKER_ENVIRONMENT` is optional for environment-scoped Worker domain APIs.
-- `CUSTOM_DOMAIN_TARGET` is optional when the domain verification target must differ from `SITE_URL` or the current Worker origin.
-
-Optional frontend development variable:
-
-- `VITE_API_BASE_URL` points the frontend at a remote API during Vite development.
-
-## Cloudflare Services
-
-### D1
-
-The Worker expects a D1 binding named `DB`.
-
-The schema includes admin, posts, site settings, subscribers, daily stats, and login-attempt tracking. The Worker creates these tables and indexes automatically when the API is first used.
-
-Migrations are stored in `backend/migrations` for explicit schema management and CI deploys.
-
-### R2
-
-The Worker expects an R2 binding named `IMAGES`.
-
-Uploaded images are stored in the `dyeink-images` bucket. If `R2_PUBLIC_URL` is set, image URLs use that public base URL. Otherwise images are served through the Worker at `/img/:key`.
-
 ## Stack
 
-- Frontend: React 18, Vite 8, TypeScript, Tailwind CSS, shadcn/Radix UI, React Router, and a small native `useSyncExternalStore` state layer.
+- Frontend: React 18, Vite 8, TypeScript, Tailwind CSS, Radix UI, React Router.
 - Backend: Hono on Cloudflare Workers.
 - Database: Cloudflare D1.
 - Storage: Cloudflare R2.
-- Authentication: PBKDF2-SHA256 password hashing, HMAC-signed HttpOnly cookies, login rate limiting.
-- Editor: Native `contentEditable` rich-text editor with sanitized HTML output.
-- UI extras: D3-powered dashboard SVG chart, custom CSS/canvas effects, GitHub-style Markdown rendering, Mermaid, MathJax, and YouTube embeds.
+- State: native `useSyncExternalStore` stores.
+- Rendering: DOMPurify, Marked, Mermaid, MathJax, D3 charting, custom canvas/WebGL effects.
 
 ## Security
 
-- First-run setup is disabled after the first admin account exists.
-- Admin passwords must meet a strong complexity policy.
-- Passwords are hashed with PBKDF2-SHA256 using a Cloudflare Workers-compatible iteration count.
-- Session cookies are signed, HttpOnly, Secure, SameSite Strict, and time-limited.
-- Login attempts are rate limited per IP address.
+- First-run setup is disabled after the admin account exists.
+- Passwords require length and complexity checks.
+- Password hashes use PBKDF2-SHA256.
+- Sessions use signed HttpOnly, Secure, SameSite Strict cookies.
+- Password changes rotate the session secret.
+- Login attempts are rate limited by IP.
 - Public post content is sanitized before rendering.
-- Server-side errors return generic JSON responses instead of exposing internals.
+- Server errors return generic JSON responses.
 
-## Useful Commands
+## Commands
 
 ```bash
 npm run build
@@ -291,30 +216,34 @@ npm audit
 
 ## Troubleshooting
 
-### Setup fails after entering a password
+### Cloudflare asks for many variables
 
-Check that the deployed Worker has a valid D1 binding named `DB`. On Workers deploys, Wrangler can provision it from `wrangler.toml`. On Pages deploys, you must create and bind the D1 database in the Pages dashboard or use a Pages-specific config with a real `database_id`.
+Only D1 and R2 are required for a normal deploy. Leave optional variables blank unless you are enabling that feature.
 
-Also make sure the password satisfies the full policy: at least 12 characters with lowercase, uppercase, number, and special character.
+### Setup fails
 
-### Wrangler says a Pages `_worker.js` file is being uploaded as an asset
+Check that the Worker has a D1 binding named `DB`. Also confirm the password satisfies the full policy.
 
-That happens when using a Workers deploy with `platform/dist/_worker.js` present. The build script writes `platform/dist/.assetsignore` containing `_worker.js` so Workers Assets does not upload server-side code as a public asset. Re-run:
+### Uploads fail
+
+Check that the Worker has an R2 binding named `IMAGES` and that R2 is enabled for the account.
+
+### `_worker.js` is uploaded as an asset
+
+Re-run:
 
 ```bash
 npm run build
 ```
 
-Then deploy again.
+The build writes `platform/dist/.assetsignore` so Workers Assets does not publish the Pages Worker file as a static asset.
 
-### Wrangler says `database_id` is missing
+### `database_id` is missing
 
-For Workers, deploy with Wrangler 4 from the repository root so resource provisioning can create the D1 database declared in `wrangler.toml`.
+For Workers, deploy from the repository root with Wrangler 4 so Cloudflare can create or bind the D1 database declared in `wrangler.toml`.
 
-For Pages, create the D1 database yourself and bind it to `DB`, or replace the placeholder in `wrangler.pages.toml` with the real D1 database ID before using that config.
+For Pages, create the D1 database yourself and bind it to `DB`, or replace the placeholder in `wrangler.pages.toml`.
 
 ## License
 
 DyeInk is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
-
-</small>

@@ -113,7 +113,7 @@ export default function Landing() {
             </section>
             <footer style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '2rem', display: 'flex', justifyContent: 'center' }}>
                 <a
-                    href="https://github.com/subratomandalme/dyeink"
+                    href="https://github.com/subratomandal/dyeink"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
