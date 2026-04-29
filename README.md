@@ -1,5 +1,3 @@
-# DyeInk
-
 ![DyeInk](platform/public/Di.png)
 
 DyeInk is a single-admin blog for Cloudflare Workers. It uses D1 for data, R2 for uploads and public JSON artifacts, and a React/Vite app served from the same Worker.
