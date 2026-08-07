@@ -16,6 +16,7 @@ export default function Login() {
     const { isAuthenticated, isLoading, hasChecked, needsSetup, initialize, login } = useAuthStore()
     const [password, setPassword] = useState('')
     const [submitting, setSubmitting] = useState(false)
+    const [showRecovery, setShowRecovery] = useState(false)
 
     useEffect(() => {
         if (!hasChecked && !isLoading) {
@@ -112,6 +113,30 @@ export default function Login() {
                             {submitting ? 'Signing in…' : 'Sign In'}
                         </Button>
                     </form>
+
+                    <div className="mt-6 border-t border-border/60 pt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowRecovery((open) => !open)}
+                            className="mx-auto block text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                        >
+                            Forgot your password?
+                        </button>
+                        {showRecovery && (
+                            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                                Only a one-way hash of your password is stored, so there is no reset
+                                email. From your DyeInk checkout, sign in with{' '}
+                                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+                                    npx wrangler login
+                                </code>{' '}
+                                and run{' '}
+                                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+                                    npm run admin:reset-password
+                                </code>
+                                .
+                            </p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
         </div>

@@ -89,7 +89,7 @@ For a normal deployment, leave optional values blank and keep the defaults shown
 
 | Variable | Default | When to set it |
 | --- | --- | --- |
-| `APP_PASSWORD` | Blank | Seed the first admin password and skip the setup wizard. |
+| `APP_PASSWORD` | Blank | Seed the first admin password and skip the setup wizard. New installs only. |
 | `R2_PUBLIC_URL` | Blank | Serve images from a public/custom R2 domain instead of `/img/:key`. |
 | `D1_HIT_ROLLUPS` | `on` | Set to `off` only if you do not want D1 view/share counters. |
 | `FRONTEND_ORIGIN` | Blank | Lock API CORS to one origin. |
@@ -127,6 +127,33 @@ Optional first-admin password seed:
 ```bash
 npx wrangler secret put APP_PASSWORD
 ```
+
+## Admin Password
+
+DyeInk stores only a PBKDF2-SHA256 hash of the password, so it cannot be read back out of D1 or the Cloudflare dashboard. A forgotten password can be replaced, never recovered.
+
+If you still know the password, change it in the admin dashboard under Settings. If you have lost it, reset it from your checkout:
+
+```bash
+npx wrangler login
+npm run admin:reset-password
+```
+
+The command prompts for a new password, hashes it with the same code the Worker uses to verify logins, writes it to D1, rotates the session secret so every existing session is signed out, and clears the login rate-limit rows. Useful flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--local` | Target the `wrangler dev` database instead of the deployed one. |
+| `--stdin` | Read the password from stdin for non-interactive use. |
+| `--print-sql` | Print the SQL without touching any database. Output contains a live session secret. |
+
+For CI or scripted use, pass the password in rather than typing it:
+
+```bash
+printf '%s' "$NEW_PASSWORD" | npm run admin:reset-password -- --stdin
+```
+
+`APP_PASSWORD` seeds a brand-new install only. Once setup has completed, changing it has no effect, and clearing the admin row will not re-seed it — reset the password with the command above instead.
 
 ## Cloudflare Pages
 
@@ -199,6 +226,7 @@ npm run db:migrate:local
 ## Security
 
 - First-run setup is disabled after the admin account exists.
+- Password recovery requires Cloudflare account access. There is no reset email and no recovery endpoint.
 - Passwords require length and complexity checks.
 - Password hashes use PBKDF2-SHA256.
 - Sessions use signed HttpOnly, Secure, SameSite Strict cookies.
@@ -217,10 +245,15 @@ npm run dev:all
 npm run deploy
 npm run db:migrate
 npm run db:migrate:local
+npm run admin:reset-password
 npm audit
 ```
 
 ## Troubleshooting
+
+### Forgot the admin password
+
+Run `npm run admin:reset-password`. See [Admin Password](#admin-password). Setting `APP_PASSWORD` again will not help, because it only seeds installs that have never been set up.
 
 ### Cloudflare asks for many variables
 

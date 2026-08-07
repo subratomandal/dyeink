@@ -96,7 +96,7 @@ export default function Setup() {
                     <Alert className="mb-6">
                         <AlertDescription className="text-xs">
                             This is the only credential for your blog. Store it in a password manager — there is no
-                            recovery link.
+                            reset email, and recovery needs CLI access to your Cloudflare account.
                         </AlertDescription>
                     </Alert>
 
