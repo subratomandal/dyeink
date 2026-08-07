@@ -17,7 +17,8 @@
     "preview": "cd platform && npm run preview",
     "deploy": "cd backend && npm run deploy",
     "db:migrate": "cd backend && npm run db:migrate",
-    "db:migrate:local": "cd backend && npm run db:migrate:local"
+    "db:migrate:local": "cd backend && npm run db:migrate:local",
+    "admin:reset-password": "node scripts/reset-admin-password.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
