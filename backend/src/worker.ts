@@ -323,17 +323,27 @@ function ensureSchema(db: D1Database): Promise<void> {
 
 /**
  * On first request, initialize the schema and seed the admin row from APP_PASSWORD if present.
- * If APP_PASSWORD isn't set, GET /api/setup/status returns { initialized: false }
+ * If there is nothing to seed, GET /api/setup/status returns { initialized: false }
  * and the UI shows a setup form.
+ *
+ * Seeding only ever applies to an install that has never been set up. A site_settings
+ * row is what marks an install as set up, because only POST /api/setup and
+ * authenticated admin writes create it. That guard matters for password recovery:
+ * without it, clearing the admin row to escape a forgotten password would silently
+ * restore the same forgotten APP_PASSWORD on the very next request. Changing the
+ * password after setup is done with `npm run admin:reset-password`.
  */
 async function ensureBootstrap(c: AppCtx) {
   await ensureSchema(c.env.DB)
 
-  const row = await c.env.DB.prepare('SELECT id FROM admin WHERE id = 1').first()
-  if (row) return
-
   const seed = c.env.APP_PASSWORD
-  if (!seed) return // leave uninitialized; UI will drive setup
+  if (!seed) return // nothing to seed; the UI drives setup
+
+  const [admin, settings] = await c.env.DB.batch<{ id: number }>([
+    c.env.DB.prepare('SELECT id FROM admin WHERE id = 1'),
+    c.env.DB.prepare('SELECT id FROM site_settings WHERE id = 1'),
+  ])
+  if (admin.results.length > 0 || settings.results.length > 0) return
 
   const passwordHash = await hashPassword(seed)
   await c.env.DB.prepare(
