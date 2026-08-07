@@ -15,6 +15,7 @@ import {
   clearSessionCookie,
   createSessionToken,
   hashPassword,
+  isStrongPassword,
   randomToken,
   readSessionCookie,
   verifyPassword,
@@ -1953,15 +1954,6 @@ function slugify(input: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-}
-
-function isStrongPassword(s: string): boolean {
-  if (s.length < 12) return false
-  if (!/[a-z]/.test(s)) return false
-  if (!/[A-Z]/.test(s)) return false
-  if (!/[0-9]/.test(s)) return false
-  if (!/[^A-Za-z0-9]/.test(s)) return false
-  return true
 }
 
 async function authPeek(c: AppCtx) {

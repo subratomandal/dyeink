@@ -47,6 +47,22 @@ function randomBytes(n: number): Uint8Array<ArrayBuffer> {
   return arr
 }
 
+// --- password policy ---
+
+/**
+ * The single definition of the admin password policy. `scripts/reset-admin-password.mjs`
+ * compiles this module too, so the CLI and the Worker can never disagree on what
+ * counts as a valid password.
+ */
+export function isStrongPassword(s: string): boolean {
+  if (s.length < 12) return false
+  if (!/[a-z]/.test(s)) return false
+  if (!/[A-Z]/.test(s)) return false
+  if (!/[0-9]/.test(s)) return false
+  if (!/[^A-Za-z0-9]/.test(s)) return false
+  return true
+}
+
 // --- password hashing ---
 
 export async function hashPassword(password: string): Promise<string> {
